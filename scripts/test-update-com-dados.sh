@@ -129,20 +129,17 @@ tem_title() {
 }
 
 echo "==> prelude (os stubs que um Postgres cru não tem)"
-# Extraído do scripts/test-db.sh em vez de duplicado: prelude que diverge do
-# harness mediria um mundo que o gate obrigatório não conhece.
-prelude=$(sed -n "/^psql_install <<'SQL'$/,/^SQL$/p" "$ROOT/scripts/test-db.sh" | sed '1d;$d')
-# Guarda de instrumento: se a extração falhar (o test-db.sh muda de forma), o
-# prelude sai VAZIO e o install falha longe daqui, com um erro que não menciona
-# prelude nenhum. Aconteceu ao escrever este script: o regex sem o apóstrofo
-# final extraiu zero linhas e o sintoma foi `type public.vector does not exist`.
+# O mesmo arquivo que o scripts/test-db.sh e a VPS aplicam: prelude que diverge
+# do harness mediria um mundo que o gate obrigatório não conhece.
+prelude=$(cat "$ROOT/scripts/selfhost-prelude.sql")
+# Guarda de instrumento: prelude vazio faz o install falhar longe daqui, com um
+# erro que não menciona prelude nenhum (`type public.vector does not exist`).
 if [ "$(grep -c 'create extension' <<<"$prelude")" -lt 3 ]; then
-  echo "FATAL: a extração do prelude de scripts/test-db.sh falhou (sem 'create extension')." >&2
-  echo "       O formato daquele arquivo mudou — conserte o recorte aqui, e não duplique o prelude." >&2
+  echo "FATAL: scripts/selfhost-prelude.sql está vazio ou sem 'create extension'." >&2
   exit 1
 fi
 psql_stop <<<"$prelude"
-echo "    ✓ prelude ok ($(wc -l <<<"$prelude" | tr -d ' ') linhas, extraídas do harness)"
+echo "    ✓ prelude ok ($(wc -l <<<"$prelude" | tr -d ' ') linhas, de scripts/selfhost-prelude.sql)"
 
 echo "==> INSTALL: baseline.sql com ON_ERROR_STOP=1"
 psql_stop < "$BASELINE" >/dev/null
