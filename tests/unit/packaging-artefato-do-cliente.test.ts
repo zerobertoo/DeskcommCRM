@@ -95,11 +95,17 @@ describe("packaging — o artefato que o cliente instala", () => {
     // O par da telefonia por SIP (#677, profile `telefonia`) segue a mesma
     // divisão: `asterisk` é upstream, pinado por digest e fora de `NOSSOS`;
     // `voice-agent` é código nosso, publicado pelo CI, e está em `NOSSOS`.
+    //
+    // `db`, `postgrest` e `gateway` (banco próprio, sem a plataforma Supabase)
+    // são imagens upstream com tag fixa — fora de `NOSSOS` pelo mesmo motivo.
     expect([...servicos.keys()].sort()).toEqual(
       [
         "app",
         "asterisk",
         "caddy",
+        "db",
+        "gateway",
+        "postgrest",
         "redis",
         "scheduler",
         "srh",

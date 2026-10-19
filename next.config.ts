@@ -89,6 +89,14 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.supabase.in" },
     ],
   },
+  // O navegador fala com o PostgREST pela origem do próprio app (a
+  // NEXT_PUBLIC_SUPABASE_URL é a URL do app). Rewrite e não Caddyfile: vale atrás
+  // do Caddy, do Traefik e do cloudflared igual. Lido no BUILD — a imagem é
+  // genérica, por isso o default é o nome do serviço no compose.
+  async rewrites() {
+    const postgrest = process.env.POSTGREST_INTERNAL_URL || "http://postgrest:3000";
+    return [{ source: "/rest/v1/:path*", destination: `${postgrest}/:path*` }];
+  },
   async headers() {
     return [
       {

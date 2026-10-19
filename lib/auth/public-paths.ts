@@ -36,6 +36,10 @@ export const PUBLIC_PATHS: RegExp[] = [
   /^\/500$/,
   /^\/503$/,
   /^\/api\/v1\/health$/,
+  // PostgREST pela origem do app (rewrite do next.config). Quem autentica é o
+  // JWT no `Authorization`, validado pelo PostgREST, e quem autoriza é a RLS —
+  // o cookie de sessão não tem papel aqui.
+  /^\/rest\/v1\//,
   /^\/api\/v1\/webhooks\//,
   /^\/api\/v1\/cron\//,
   // Landing page de captura de clique do Google Ads (migration 0306). Quem

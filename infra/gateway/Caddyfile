@@ -1,0 +1,18 @@
+# Gateway interno: ocupa o lugar do Kong do Supabase.
+#
+# O `@supabase/supabase-js` monta `${url}/rest/v1/<tabela>`, e o PostgREST serve
+# na raiz. Servidor e worker apontam `SUPABASE_SERVER_URL`/`SUPABASE_URL` para
+# cá (http://gateway:8000), e nenhum cliente precisa mudar. Não publica porta em
+# produção: só a rede interna o alcança.
+{
+	admin off
+	auto_https off
+}
+
+:8000 {
+	handle_path /rest/v1/* {
+		reverse_proxy postgrest:3000
+	}
+
+	respond 404
+}

@@ -437,6 +437,57 @@ services:
     logging: *default-logging
     networks: [internal]
 
+  # Banco próprio (fork sem a plataforma Supabase). O primeiro boot aplica o
+  # prelude e a senha do `authenticator` (infra/postgres/initdb); o baseline é
+  # do kit. Sem porta publicada: só a rede interna o alcança.
+  db:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./infra/postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - ./scripts/selfhost-prelude.sql:/deskcomm/selfhost-prelude.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+    networks: [internal]
+
+  # A API REST que o `@supabase/supabase-js` já fala. Valida o JWT com
+  # PGRST_JWT_SECRET e assume o papel do claim `role` (anon, authenticated,
+  # service_role), então as policies RLS do baseline valem sem mudança.
+  postgrest:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_EXTRA_SEARCH_PATH: public,extensions
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?defina PGRST_JWT_SECRET no .env}
+      # o teto que o Supabase aplica; o app foi escrito contra ele
+      PGRST_DB_MAX_ROWS: "1000"
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *default-logging
+    networks: [internal]
+
+  # No lugar do Kong: tira o prefixo /rest/v1 (infra/gateway/Caddyfile).
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    volumes:
+      - ./infra/gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - postgrest
+    logging: *default-logging
+    networks: [internal]
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -466,6 +517,7 @@ services:
     networks: [internal, caddy-sites]
 
 volumes:
+  db-data:
   waha-data:
   waha-media:
   wacalls-data:
