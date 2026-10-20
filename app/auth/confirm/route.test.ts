@@ -202,18 +202,6 @@ describe("GET /auth/confirm", () => {
     expect(vi.mocked(aplicarConvite)).not.toHaveBeenCalled();
   });
 
-  it("template padrão (formato code) sem sessão: mantém o diagnóstico próprio", async () => {
-    comSupabase({
-      verifyOtp: { data: { user: null }, error: { message: "PKCE code verifier not found in storage" } },
-      getUser: { data: { user: null } },
-    });
-
-    const { GET } = await import("./route");
-    const res = await GET(requisicao("code=abc"));
-
-    expect(destino(res)).toBe("/login?error=template_padrao");
-  });
-
   it("vínculo falhou: degrada para a tela de aceite, nunca deixa sem saída", async () => {
     comSupabase({ verifyOtp: { data: { user: USUARIO }, error: null }, getUser: { data: { user: null } } });
     vi.mocked(decidirConviteDoSignup).mockReturnValue({

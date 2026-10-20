@@ -11,7 +11,7 @@ import { APIError } from "better-auth/api";
 import { env } from "@/lib/env";
 import { emailConfigurado } from "@/lib/email/roteador";
 import { criarAuthAdmin, gravarSenha } from "@/lib/auth/compat/admin";
-import { descartarLinksPendentes, emitirLink, enviarLink } from "@/lib/auth/compat/verificacao";
+import { consumirLink, descartarLinksPendentes, emitirLink, enviarLink } from "@/lib/auth/compat/verificacao";
 import { auth, poolDeAuth } from "@/lib/auth/better-auth";
 import { buscarUsuarioPorId, erroCompat } from "@/lib/auth/compat/usuario";
 import { criarMfaCompat } from "@/lib/auth/compat/mfa";
@@ -210,9 +210,57 @@ function montarAuth(
       }
       return { data: { user, session: null }, error: null };
     },
-    verifyOtp: naoConvertido("verifyOtp"),
-    resend: naoConvertido("resend"),
-    resetPasswordForEmail: naoConvertido("resetPasswordForEmail"),
+    /** Gasta o link do e-mail (signup/invite/recovery), confirma o e-mail e abre a sessão. */
+    async verifyOtp({ type, token_hash }: { type: string; token_hash: string }) {
+      const tipo = type === "signup" || type === "invite" || type === "recovery" ? type : null;
+      const dono = tipo ? await consumirLink([tipo], token_hash) : null;
+      if (!dono) return { data: { user: null, session: null }, error: erroCompat("Email link is invalid or has expired", 403, "otp_expired") };
+      await poolDeAuth().query(
+        "update auth.users set email_verified = true, email_confirmed_at = coalesce(email_confirmed_at, now()), updated_at = now() where id = $1",
+        [dono.userId],
+      );
+      const aberta = await auth().api.abrirSessao({ body: { userId: dono.userId }, headers: await obterHeaders() });
+      definirSessao({ userId: dono.userId, sessionId: aberta.sessionId, aal: "aal1" });
+      const user = await buscarUsuarioPorId(dono.userId);
+      return { data: { user, session: { access_token: aberta.token, user } }, error: null };
+    },
+
+    /** Reenvia a confirmação de cadastro; e-mail desconhecido ou já confirmado responde igual (anti-enumeração). */
+    async resend({ email, options }: { type: "signup"; email: string; options?: { emailRedirectTo?: string } }) {
+      const endereco = email.trim().toLowerCase();
+      const { rows } = await poolDeAuth().query<{ id: string }>(
+        "select id from auth.users where email = $1 and not email_verified",
+        [endereco],
+      );
+      if (rows[0]) {
+        await descartarLinksPendentes("signup", rows[0].id);
+        const enviado = await enviarLink({
+          tipo: "signup",
+          para: endereco,
+          token: await emitirLink("signup", rows[0].id, endereco),
+          redirectTo: options?.emailRedirectTo ?? `${env.NEXT_PUBLIC_APP_URL}/auth/confirm?type=signup`,
+        });
+        if (!enviado.ok) return { data: null, error: erroCompat("Error sending confirmation email", 500) };
+      }
+      return { data: {}, error: null };
+    },
+
+    /** Manda o link de redefinição; e-mail desconhecido responde sucesso igual (anti-enumeração). */
+    async resetPasswordForEmail(email: string, opcoes?: { redirectTo?: string }) {
+      const endereco = email.trim().toLowerCase();
+      const { rows } = await poolDeAuth().query<{ id: string }>("select id from auth.users where email = $1 and not banned", [endereco]);
+      if (rows[0]) {
+        await descartarLinksPendentes("recovery", rows[0].id);
+        const enviado = await enviarLink({
+          tipo: "recovery",
+          para: endereco,
+          token: await emitirLink("recovery", rows[0].id, endereco),
+          redirectTo: opcoes?.redirectTo ?? `${env.NEXT_PUBLIC_APP_URL}/auth/confirm?type=recovery`,
+        });
+        if (!enviado.ok) return { data: null, error: erroCompat("Error sending recovery email", 500) };
+      }
+      return { data: {}, error: null };
+    },
     signInWithOAuth: naoConvertido("signInWithOAuth"),
     exchangeCodeForSession: naoConvertido("exchangeCodeForSession"),
   };

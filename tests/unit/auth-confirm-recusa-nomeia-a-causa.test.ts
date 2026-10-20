@@ -91,37 +91,11 @@ describe("/auth/confirm nomeia a causa da recusa", () => {
     return expect(destino("?token_hash=abc&type=recovery")).resolves.toBe("?error=link_invalido");
   });
 
-  it("code que falhou vira `template_padrao` — pedir outro NÃO resolve", async () => {
-    supabaseQue(RECUSA);
-    expect(await destino("?code=pkce_abc")).toBe("?error=template_padrao");
-  });
-
   it("link sem token nenhum continua `link_invalido` e não chama o Supabase", async () => {
     const { verifyOtp, exchangeCodeForSession } = supabaseQue(RECUSA);
     expect(await destino("")).toBe("?error=link_invalido");
     expect(verifyOtp).not.toHaveBeenCalled();
     expect(exchangeCodeForSession).not.toHaveBeenCalled();
-  });
-
-  it("o audit registra QUAL formato falhou — sem isso a triagem começa do zero", async () => {
-    supabaseQue(RECUSA);
-    await chamar("?code=pkce_abc");
-    expect(vi.mocked(audit)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "auth.email_link_rejected",
-        metadata: expect.objectContaining({ formato: "code" }),
-      }),
-    );
-
-    vi.clearAllMocks();
-    supabaseQue(RECUSA);
-    await chamar("?token_hash=abc&type=signup");
-    expect(vi.mocked(audit)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "auth.email_link_rejected",
-        metadata: expect.objectContaining({ formato: "token_hash" }),
-      }),
-    );
   });
 
   it("a tela do login tem texto para o código novo — senão a recusa fica muda", () => {

@@ -12,79 +12,28 @@ import { env } from "@/lib/env";
 /**
  * GET /auth/confirm — troca o token do e-mail por uma sessão.
  *
- * É o destino único dos links de e-mail do GoTrue: confirmação de signup E
- * redefinição de senha. Dois formatos de link chegam aqui, dependendo de como
- * o projeto Supabase está configurado:
- *
- * - `token_hash` + `type`: template de e-mail customizado (supabase/templates/,
- *   subidos por `hostgator-setup-kit/marca-emails.sh`) linkando direto pro app.
- *   NÃO exige SMTP customizado — a versão anterior deste comentário afirmava
- *   que sim ("sem isso o Supabase não deixa editar o corpo do e-mail") e isso
- *   foi MEDIDO como falso em 2026-08-14: `GET /v1/projects/{ref}/config/auth`
- *   do projeto de produção devolve `smtp_host: null` COM os templates
- *   customizados gravados, e um `PATCH` de `mailer_templates_*` num projeto
- *   sem SMTP responde 200 e persiste byte a byte (conferido relendo com GET).
- *   O que exige SMTP próprio é o VOLUME de envio, não o corpo do e-mail.
- * - `code` (PKCE): template PADRÃO do Supabase (o de quem nunca configurou os
- *   templates — caso mais comum em instalação fresca). O e-mail linka pro
- *   `/auth/v1/verify` do próprio GoTrue, que valida e SÓ ENTÃO redireciona pra
- *   cá com o code; não inclui `type`, por isso requestPasswordReset.ts e
- *   signUp.ts anexam `?type=` no redirectTo/emailRedirectTo — é o único jeito
- *   desse dado sobreviver ao hop pelo GoTrue nesse formato.
- *
- *   ⚠️ O formato `code` NÃO FECHA nesta instalação, e o motivo é estrutural.
- *   `@supabase/ssr` força `flowType: "pkce"` (createServerClient.js:33) e grava
- *   o verificador num cookie (`<storageKey>-code-verifier`, cookies.js:18) com
- *   as MESMAS `cookieOptions` da sessão (cookies.js:227,232) — isto é, com o
- *   `sameSite: "strict"` de `lib/supabase/server.ts:35`. Clique de link vindo
- *   de webmail é navegação CROSS-SITE: o navegador não manda cookie Strict, o
- *   verificador não chega, e `exchangeCodeForSession` falha. O formato
- *   `token_hash` não depende de cookie nenhum.
- *
- *   (O que NÃO está medido: um cliente de e-mail nativo abre o link sem
- *   iniciador, e nesse caso o navegador PODE mandar o cookie Strict. Por isso a
- *   mensagem da tela aponta a configuração como conserto, e não promete que
- *   "abrir noutro lugar" funciona.)
- *
- *   É por isso que a recusa dos dois ramos não pode ter a mesma mensagem:
- *   "link inválido ou expirado" manda o operador caçar TTL e relógio quando o
- *   problema é que os templates nunca foram configurados.
+ * Destino único dos links de e-mail: confirmação de cadastro, convite e
+ * redefinição de senha. O link traz `token_hash` + `type` (gerados em
+ * `lib/auth/compat/verificacao.ts`); não há mais formato `code`/PKCE.
  *
  * - type=signup  → provisiona o tenant (org + membership admin) e entra no
  *                  onboarding. Provisionamento é idempotente (link clicado 2x).
  * - type=recovery → sessão de recovery estabelecida; segue para /login/reset
  *                  onde o usuário define a senha nova.
  *
- * Fluxo canônico do @supabase/ssr: verifyOtp/exchangeCodeForSession grava os
- * cookies de sessão via cookies() do next/headers; o Next anexa os Set-Cookie
- * ao redirect retornado.
- *
  * ── ABRIR O LINK NÃO GASTA O TOKEN ──────────────────────────────────────────
  *
  * O `token_hash` é de uso único, e quem abre o link primeiro fica com ele.
- * Medido numa instalação real em 2026-10-03, nos logs do Supabase Auth: ~12 s
- * depois de cada e-mail de recuperação para um endereço Hotmail, um `verify`
- * com 200 consumia o token — o verificador de links da Microsoft visitando o
- * link na entrega — e o clique de verdade caía em `One-time token not found`.
- * O mesmo vale para convite e confirmação de cadastro, e para qualquer filtro
- * corporativo que pré-visite links (Safe Links, gateways de e-mail, antivírus).
+ * Verificadores de link (Microsoft Safe Links, gateways de e-mail, antivírus)
+ * visitam o link na entrega e consumiriam o token antes do clique de verdade.
  *
- * Por isso o GET com `token_hash` NÃO chama o provedor: leva a
- * `/login/continuar`, que mostra um botão. Quem gasta o token é o POST desse
- * botão — verificador automático segue link, não aperta botão de formulário.
- * O formato `code` segue no GET como antes, e esta proteção NÃO o alcança: no
- * template padrão o link do e-mail aponta para o `/auth/v1/verify` do GoTrue,
- * que gasta o OTP lá, antes de redirecionar para cá com o `code` — um
- * verificador que abra esse link gasta o OTP fora do nosso alcance (não
- * medido; é a leitura do caminho descrito no início deste comentário). O
- * conserto para esse formato é o mesmo de sempre: subir os templates
- * customizados (`hostgator-setup-kit/marca-emails.sh`), que trocam o link pelo
- * `token_hash` e caem na proteção acima.
+ * Por isso o GET NÃO gasta o token: leva a `/login/continuar`, que mostra um
+ * botão. Quem gasta é o POST desse botão — verificador automático segue link,
+ * não aperta botão de formulário.
  */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
   const tokenHash = url.searchParams.get("token_hash");
-  const code = url.searchParams.get("code");
   const type = url.searchParams.get("type");
 
   if (tokenHash && type) {
@@ -94,7 +43,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(continuar);
   }
 
-  return confirmar({ tokenHash: null, code, type: type as EmailOtpType | null, request, status: 307 });
+  return NextResponse.redirect(new URL("/login?error=link_invalido", env.NEXT_PUBLIC_APP_URL), 307);
 }
 
 /** O botão "Continuar" de `/login/continuar` — o único caminho que gasta o `token_hash`. */
@@ -107,7 +56,6 @@ export async function POST(request: NextRequest) {
   // 303 e não 307: o 307 repetiria o POST no destino (`/login/reset`, `/app`…).
   return confirmar({
     tokenHash: campo("token_hash"),
-    code: null,
     type: campo("type") as EmailOtpType | null,
     request,
     status: 303,
@@ -116,13 +64,11 @@ export async function POST(request: NextRequest) {
 
 async function confirmar({
   tokenHash,
-  code,
   type,
   request,
   status,
 }: {
   tokenHash: string | null;
-  code: string | null;
   type: EmailOtpType | null;
   request: NextRequest;
   status: 303 | 307;
@@ -134,20 +80,12 @@ async function confirmar({
   // público — o link de recovery quebra silenciosamente para o usuário final.
   const redirectTo = (path: string) => NextResponse.redirect(new URL(path, env.NEXT_PUBLIC_APP_URL), status);
 
-  if (!(tokenHash && type) && !code) {
+  if (!(tokenHash && type)) {
     return redirectTo("/login?error=link_invalido");
   }
 
-  // Qual dos dois formatos chegou é um FATO observável, não inferência: o
-  // `code` só existe no link que o template PADRÃO do Supabase monta. Guardar
-  // isso antes da chamada é o que permite explicar a recusa depois.
-  const viaTokenHash = Boolean(tokenHash && type);
-
   const supabase = await createClient();
-  const { data, error } =
-    tokenHash && type
-      ? await supabase.auth.verifyOtp({ type, token_hash: tokenHash })
-      : await supabase.auth.exchangeCodeForSession(code as string);
+  const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
 
   // CLICAR DUAS VEZES NO MESMO LINK não é motivo para expulsar ninguém.
   // O token é de uso único: o segundo clique cai aqui com "Email link is
@@ -171,17 +109,10 @@ async function confirmar({
   if (!usuario) {
     await audit({
       action: "auth.email_link_rejected",
-      // `formato` é o campo que faltava: sem ele os dois modos de falha
-      // chegavam ao audit log indistinguíveis, e a triagem de "o link não
-      // funciona" começava do zero toda vez.
-      metadata: { type, formato: viaTokenHash ? "token_hash" : "code", reason: error?.message ?? "no_user" },
+      metadata: { type, reason: error?.message ?? "no_user" },
       requestId,
     });
-    // Dois códigos porque são duas causas e dois consertos. `link_invalido`
-    // continua sendo "peça outro link". `template_padrao` diz o que a tela
-    // antes escondia: o link veio do modelo padrão, pedir outro não adianta, e
-    // o conserto é configurar os templates (hostgator-setup-kit/marca-emails.sh).
-    return redirectTo(viaTokenHash ? "/login?error=link_invalido" : "/login?error=template_padrao");
+    return redirectTo("/login?error=link_invalido");
   }
 
   if (sessaoPreservada) {
@@ -194,7 +125,7 @@ async function confirmar({
       actorUserId: usuario.id,
       metadata: {
         type,
-        formato: viaTokenHash ? "token_hash" : "code",
+
         reason: error?.message ?? "no_user",
         sessao_preservada: true,
       },
@@ -282,7 +213,7 @@ async function confirmar({
       metadata: { reason: e instanceof Error ? e.message : String(e) },
       requestId,
     });
-    // A sessão JÁ está firmada (o `verifyOtp`/`exchangeCodeForSession` acima
+    // A sessão JÁ está firmada (o `verifyOtp` acima
     // passou). Mandar para `/login` deixava a pessoa logada e sem organização,
     // sem nenhum caminho de volta — ver `app/actions/auth/recoverOrganization.ts`.
     return redirectTo("/get-started");
