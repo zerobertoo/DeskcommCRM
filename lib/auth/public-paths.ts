@@ -40,6 +40,12 @@ export const PUBLIC_PATHS: RegExp[] = [
   // JWT no `Authorization`, validado pelo PostgREST, e quem autoriza é a RLS —
   // o cookie de sessão não tem papel aqui.
   /^\/rest\/v1\//,
+  // Better Auth (entrada, MFA, token do PostgREST). "Público" aqui é "o proxy não
+  // decide": cada rota resolve a sessão sozinha e o token recusa com 401.
+  /^\/api\/auth\//,
+  // Better Auth (entrada, MFA, token do PostgREST). "Público" aqui é "o proxy não
+  // decide": cada rota resolve a sessão sozinha e o token recusa com 401.
+  /^\/api\/auth\//,
   /^\/api\/v1\/webhooks\//,
   /^\/api\/v1\/cron\//,
   // Landing page de captura de clique do Google Ads (migration 0306). Quem

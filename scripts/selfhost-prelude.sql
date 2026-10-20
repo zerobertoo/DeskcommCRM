@@ -147,6 +147,80 @@ create table if not exists auth.sessions (
 create table if not exists auth.mfa_factors (
  id uuid primary key, user_id uuid not null references auth.users(id), status text, factor_type text default 'totp'
 );
+-- Better Auth sobre o shim (fork sem a plataforma Supabase): ele grava usuário e
+-- sessão nestas mesmas tabelas, com uuid gerado pelo banco. Os nomes das colunas
+-- novas são mapeados em lib/auth/better-auth.ts. Segredo (hash de senha, TOTP)
+-- mora em accounts/two_factors, que NÃO recebem grant: nenhum papel do PostgREST
+-- as alcança, só o dono do banco (a conexão do Better Auth).
+-- `mfa_factors` segue tabela por enquanto — vira view sobre `two_factors` quando
+-- o fluxo de MFA for convertido, porque os invariantes ainda inserem nela.
+alter table auth.users add column if not exists name text not null default '';
+alter table auth.users add column if not exists email_verified boolean not null default false;
+alter table auth.users add column if not exists image text;
+alter table auth.users add column if not exists updated_at timestamptz not null default now();
+alter table auth.users add column if not exists role text;
+alter table auth.users add column if not exists banned boolean not null default false;
+alter table auth.users add column if not exists ban_reason text;
+alter table auth.users add column if not exists ban_expires timestamptz;
+alter table auth.users add column if not exists two_factor_enabled boolean not null default false;
+
+-- GoTrue apaga sessão e fator junto com o usuário; sem o cascade, remover um
+-- usuário (teste, LGPD) falha na FK.
+alter table auth.sessions drop constraint if exists sessions_user_id_fkey;
+alter table auth.sessions add constraint sessions_user_id_fkey
+  foreign key (user_id) references auth.users(id) on delete cascade;
+alter table auth.mfa_factors drop constraint if exists mfa_factors_user_id_fkey;
+alter table auth.mfa_factors add constraint mfa_factors_user_id_fkey
+  foreign key (user_id) references auth.users(id) on delete cascade;
+alter table auth.sessions alter column id set default gen_random_uuid();
+alter table auth.sessions add column if not exists token text unique;
+alter table auth.sessions add column if not exists ip_address text;
+alter table auth.sessions add column if not exists user_agent text;
+alter table auth.sessions add column if not exists created_at timestamptz not null default now();
+alter table auth.sessions add column if not exists updated_at timestamptz not null default now();
+alter table auth.sessions add column if not exists impersonated_by text;
+
+create table if not exists auth.accounts (
+  id uuid primary key default gen_random_uuid(),
+  account_id text not null,
+  provider_id text not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  access_token text, refresh_token text, id_token text,
+  access_token_expires_at timestamptz, refresh_token_expires_at timestamptz,
+  scope text, password text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists auth.verifications (
+  id uuid primary key default gen_random_uuid(),
+  identifier text not null, value text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists auth.two_factors (
+  id uuid primary key default gen_random_uuid(),
+  secret text not null, backup_codes text not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  verified boolean default true,
+  failed_verification_count int not null default 0,
+  locked_until timestamptz
+);
+
+-- O baseline lê `raw_user_meta_data->>'full_name'`; o Better Auth grava `name`.
+create or replace function auth.fn_users_full_name() returns trigger
+  language plpgsql as $fn$
+begin
+  if coalesce(new.name, '') <> '' then
+    new.raw_user_meta_data := coalesce(new.raw_user_meta_data, '{}'::jsonb)
+      || jsonb_build_object('full_name', new.name);
+  end if;
+  return new;
+end $fn$;
+drop trigger if exists trg_users_full_name on auth.users;
+create trigger trg_users_full_name before insert or update of name on auth.users
+  for each row execute function auth.fn_users_full_name();
+
 create or replace function auth.jwt() returns jsonb language sql stable as $$
  select coalesce(nullif(current_setting('request.jwt.claim',true),''),nullif(current_setting('request.jwt.claims',true),''))::jsonb;
 $$;

@@ -197,6 +197,19 @@ const schema = z.object({
    */
   SUPABASE_DB_ADMIN_URL: z.string().optional().default(""),
 
+  /**
+   * Fork sem a plataforma Supabase: segredo do PostgREST. Assina o JWT de
+   * usuário (lib/auth/token-postgrest.ts), o cookie do Better Auth e as chaves
+   * anon/service. Vazio não derruba o boot — quem emite token recusa com erro
+   * claro (mesma política dos demais segredos opcionais no boot).
+   */
+  PGRST_JWT_SECRET: z.string().optional().default(""),
+  /**
+   * Conexão do Better Auth com o banco. Precisa gravar em `auth.*`, que a role
+   * menor de `SUPABASE_DB_URL` não alcança; vazia, cai em `SUPABASE_DB_URL`.
+   */
+  AUTH_DB_URL: z.string().optional().default(""),
+
   // WAHA
   WAHA_API_BASE_URL: required("WAHA_API_BASE_URL"),
   WAHA_API_KEY: required("WAHA_API_KEY"),
