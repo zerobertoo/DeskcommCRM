@@ -40,7 +40,8 @@ function loadEnv(): Record<string, string> {
 
 const env = loadEnv();
 
-const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
+// O app público não precisa estar de pé: o gateway interno basta.
+const SUPABASE_URL = env.SUPABASE_SERVER_URL || env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE = env.SUPABASE_SERVICE_ROLE_KEY;
 const OWNER_EMAIL = env.OWNER_EMAIL;
 const OWNER_PASSWORD = env.OWNER_PASSWORD;
