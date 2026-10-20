@@ -29,39 +29,27 @@ import { describe, expect, it } from "vitest";
 import { isPublicPath } from "@/lib/auth/public-paths";
 import { CAMINHO_DO_RETORNO_DO_GOOGLE, urlDeRetornoDoGoogle } from "@/lib/auth/entrada-com-google";
 
-const FONTE_DO_CLIENTE = readFileSync("lib/supabase/server.ts", "utf8");
+const FONTE_DO_BETTER_AUTH = readFileSync("lib/auth/better-auth.ts", "utf8");
 const FONTE_DA_ACTION = readFileSync("app/actions/auth/signInWithGoogle.ts", "utf8");
 const FONTE_DO_CALLBACK = readFileSync("app/auth/callback/route.ts", "utf8");
 
 describe("o verificador de PKCE da entrada com Google viaja de volta", () => {
-  // Sai com o GoTrue: o estado do OAuth é do Better Auth. Esta cerca volta, reescrita, com a conversão do Google.
-  it.skip("o cliente da ida grava com sameSite Lax — Strict não viaja na volta do Google", () => {
-    // A função existe e é ela que usa lax.
-    expect(FONTE_DO_CLIENTE).toMatch(/export async function createClientDeEntradaComGoogle/);
-    const corpo = FONTE_DO_CLIENTE.slice(
-      FONTE_DO_CLIENTE.indexOf("export async function createClientDeEntradaComGoogle"),
-    );
-    expect(corpo, "o cliente da entrada com Google precisa gravar com `lax`").toMatch(
-      /clienteDeServidor\(\s*"lax"\s*\)/,
-    );
-    // E o cliente de sempre continua Strict: o que fica frouxo é o verificador
-    // de uso único, nunca o cookie de sessão.
-    expect(FONTE_DO_CLIENTE).toMatch(
-      /export async function createClient\(\)[\s\S]{0,120}?"strict"/,
-    );
+  it("o estado do OAuth do Better Auth grava com sameSite Lax — Strict não viaja na volta do Google", () => {
+    expect(FONTE_DO_BETTER_AUTH).toMatch(/state:\s*\{\s*attributes:\s*\{\s*sameSite:\s*"lax"/);
+    expect(FONTE_DO_BETTER_AUTH).toMatch(/oauth_state:\s*\{\s*attributes:\s*\{\s*sameSite:\s*"lax"/);
+    // E a sessão segue Strict: o que fica frouxo é o estado de uso único.
+    expect(FONTE_DO_BETTER_AUTH).toMatch(/defaultCookieAttributes:\s*\{\s*sameSite:\s*"strict"/);
   });
 
-  it("a action de ida usa esse cliente — e não o de sessão", () => {
-    expect(FONTE_DA_ACTION).toMatch(/await createClientDeEntradaComGoogle\(\)/);
-    expect(
-      FONTE_DA_ACTION,
-      "a ida com o `createClient` de sempre grava o verificador em cookie Strict e a volta falha sempre",
-    ).not.toMatch(/await createClient\(\)/);
-  });
-
-  it("a volta troca o code por sessão NO SERVIDOR, com o cliente de sessão", () => {
-    expect(FONTE_DO_CALLBACK).toMatch(/auth\.exchangeCodeForSession\(/);
+  it("a action de ida usa o Better Auth — e a volta lê a sessão que ele gravou", () => {
+    expect(FONTE_DA_ACTION).toMatch(/auth\(\)\.api\.signInSocial\(/);
+    expect(FONTE_DO_CALLBACK).toMatch(/auth\.getUser\(\)/);
     expect(FONTE_DO_CALLBACK).toMatch(/await createClient\(\)/);
+  });
+
+  it("a ida devolve o navegador pela ponte, e a ponte é pública", () => {
+    expect(CAMINHO_DO_RETORNO_DO_GOOGLE).toBe("/auth/google-ponte");
+    expect(isPublicPath("/auth/callback")).toBe(true);
   });
 
   it("`/auth/callback` é alcançável sem cookie de sessão", () => {
@@ -115,8 +103,8 @@ describe("o verificador de PKCE da entrada com Google viaja de volta", () => {
 describe("o redirectTo da ida", () => {
   const APP = "https://crm.exemplo.com.br";
 
-  it("é absoluto, no domínio da instalação, e aponta para o callback", () => {
-    expect(urlDeRetornoDoGoogle(APP)).toBe(`${APP}/auth/callback`);
+  it("é absoluto, no domínio da instalação, e aponta para a ponte do callback", () => {
+    expect(urlDeRetornoDoGoogle(APP)).toBe(`${APP}/auth/google-ponte`);
   });
 
   it("leva o `next` pedido — é o único canal que sobrevive ao pulo pelo Google", () => {

@@ -14,16 +14,16 @@
  * usuário — a mensagem esperada da issue.
  *
  * A action é a REAL aqui (só os vizinhos dela são mockados) porque o que se
- * exercita é a costura: settings → action → estado → mensagem na tela.
+ * exercita é a costura: provedor → action → estado → mensagem na tela.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { redirect } from "next/navigation";
 import { EntrarComGoogle } from "@/components/auth/EntrarComGoogle";
 import { audit } from "@/lib/audit";
-import { createClientDeEntradaComGoogle } from "@/lib/supabase/server";
+import { estadoDoProvedorGoogle } from "@/lib/auth/provedor-google";
 
 vi.mock("next/headers", () => ({
   // Implementação de verdade, não `vi.fn()` nu: a action lê
@@ -33,35 +33,19 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
-vi.mock("@/lib/supabase/server", () => ({ createClientDeEntradaComGoogle: vi.fn() }));
+vi.mock("@/lib/auth/provedor-google", () => ({ estadoDoProvedorGoogle: vi.fn() }));
 
-const signInWithOAuth = vi.fn();
-
-function stubSettings(google: boolean) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ external: { google } }),
-    })) as unknown as typeof fetch,
-  );
-}
+const signInSocial = vi.fn();
+vi.mock("@/lib/auth/better-auth", () => ({ auth: () => ({ api: { signInSocial } }) }));
 
 beforeEach(() => {
-  signInWithOAuth.mockReset().mockResolvedValue({
-    data: { url: "https://accounts.google.com/o/oauth2/v2/auth?client_id=x" },
-    error: null,
+  signInSocial.mockReset().mockResolvedValue({
+    url: "https://accounts.google.com/o/oauth2/v2/auth?client_id=x",
+    redirect: false,
   });
   vi.mocked(redirect).mockClear();
   vi.mocked(audit).mockClear();
-  vi.mocked(createClientDeEntradaComGoogle).mockResolvedValue({
-    auth: { signInWithOAuth },
-  } as never);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
+  vi.mocked(estadoDoProvedorGoogle).mockResolvedValue("ligado");
 });
 
 async function clicar() {
@@ -71,7 +55,7 @@ async function clicar() {
 
 describe("Entrar com Google com o provedor desligado", () => {
   it("⭐ a pessoa fica na tela e vê a mensagem da issue, sem sair para o JSON cru", async () => {
-    stubSettings(false);
+    vi.mocked(estadoDoProvedorGoogle).mockResolvedValue("desligado");
 
     render(<EntrarComGoogle />);
 
@@ -81,37 +65,19 @@ describe("Entrar com Google com o provedor desligado", () => {
     expect(aviso).toBeInTheDocument();
     // Nada de navegador para fora: nem o /authorize montado, nem o redirect.
     expect(redirect).not.toHaveBeenCalled();
-    expect(signInWithOAuth).not.toHaveBeenCalled();
+    expect(signInSocial).not.toHaveBeenCalled();
     // E a frase genérica de "não foi possível falar com o Google" não pode
     // roubar o lugar da mensagem que diz ONDE está o conserto.
     expect(screen.queryByText(/Não foi possível falar com o Google agora/i)).toBeNull();
   });
 
   it("CONTROLE — provedor LIGADO: segue para o Google e nenhuma mensagem aparece", async () => {
-    stubSettings(true);
-
     render(<EntrarComGoogle />);
 
     await clicar();
 
     await waitFor(() => expect(redirect).toHaveBeenCalledTimes(1));
-    expect(signInWithOAuth).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText(/O Google não está habilitado/i)).toBeNull();
-  });
-
-  it("CONTROLE — leitura falha: o clique continua tentando o fluxo de sempre", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        throw new TypeError("fetch failed");
-      }) as unknown as typeof fetch,
-    );
-
-    render(<EntrarComGoogle />);
-
-    await clicar();
-
-    await waitFor(() => expect(redirect).toHaveBeenCalledTimes(1));
+    expect(signInSocial).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/O Google não está habilitado/i)).toBeNull();
   });
 });

@@ -20,7 +20,7 @@ import { createClient } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAdminClient } from "./admin";
-import { createClient as createClientDeServidor, createClientDeEntradaComGoogle } from "./server";
+import { createClient as createClientDeServidor } from "./server";
 
 const V = vi.hoisted(() => ({
   PUBLICA: "https://abcxyz.supabase.co",
@@ -87,21 +87,6 @@ describe("com SUPABASE_SERVER_URL preenchida, os LINKS continuam na origem públ
     expect(data?.signedUrl).not.toContain("kong:8000");
     // O contraprova: o transporte é o interno, senão o teste passaria à toa.
     expect(destinos[0]).toContain(`${V.INTERNA}/storage/v1/object/sign/b/p.png`);
-  });
-
-  // Sai com o GoTrue: o login com Google passa a ser do Better Auth (sem /auth/v1/authorize).
-  it.skip("signInWithOAuth devolve data.url na pública (login com Google)", async () => {
-    const servidor = await createClientDeEntradaComGoogle();
-
-    const { data, error } = await servidor.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${V.APP}/auth/callback`, skipBrowserRedirect: true },
-    });
-
-    expect(error).toBeNull();
-    expect(data?.url).toContain(V.PUBLICA);
-    expect(data?.url).toContain("/auth/v1/authorize");
-    expect(data?.url).not.toContain("kong:8000");
   });
 
   it("o client admin (service role) segue a mesma regra", async () => {

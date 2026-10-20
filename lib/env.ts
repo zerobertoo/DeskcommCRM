@@ -214,6 +214,9 @@ const schema = z.object({
    * sessão abre no ato. Substitui o `GOTRUE_MAILER_AUTOCONFIRM`. Padrão `false`.
    */
   AUTH_EMAIL_AUTOCONFIRM: z.string().optional().default(""),
+  /** Entrada com Google: ligada quando os dois existem (Better Auth, `socialProviders`). */
+  GOOGLE_CLIENT_ID: z.string().optional().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
 
   // WAHA
   WAHA_API_BASE_URL: required("WAHA_API_BASE_URL"),

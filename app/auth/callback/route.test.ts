@@ -58,7 +58,7 @@ const PAYLOAD = {
 };
 
 interface Cenario {
-  /** o que `exchangeCodeForSession` devolve */
+  /** o que `getUser` devolve: a sessão que o Better Auth gravou e a ponte trouxe */
   troca: { data: { user: unknown } | null; error: { message: string } | null };
   /** fatores TOTP que a conta já tem verificados */
   fatores?: { id: string; status: string }[];
@@ -67,7 +67,7 @@ interface Cenario {
 function stubSupabase(c: Cenario) {
   return {
     auth: {
-      exchangeCodeForSession: vi.fn(async () => c.troca),
+      getUser: vi.fn(async () => c.troca),
       mfa: {
         listFactors: vi.fn(async () => ({ data: { totp: c.fatores ?? [] } })),
       },
@@ -205,9 +205,9 @@ describe("GET /auth/callback", () => {
     expect(vi.mocked(ensureTenantForUser)).not.toHaveBeenCalled();
   });
 
-  it("code que não vira sessão: nenhum provisionamento, e a tela de login explica", async () => {
+  it("sem sessão na volta: nenhum provisionamento, e a tela de login explica", async () => {
     const { GET } = await comSupabase({
-      troca: { data: null, error: { message: "PKCE code verifier not found in storage" } },
+      troca: { data: null, error: { message: "Auth session missing!" } },
     });
 
     const res = await GET(requisicao("code=abc"));
@@ -217,21 +217,12 @@ describe("GET /auth/callback", () => {
     expect(vi.mocked(vinculoAtivo)).not.toHaveBeenCalled();
   });
 
-  it("desistência no Google: mensagem própria, e não se troca code nenhum", async () => {
+  it("desistência no Google: mensagem própria, e a sessão nem é consultada", async () => {
     const { GET } = await comSupabase({ troca: { data: null, error: null } });
 
     const res = await GET(requisicao("error=access_denied&error_description=denied"));
 
     expect(await destino(res)).toBe("/login?error=entrada_com_google_cancelada");
-    expect(vi.mocked(createClient)).not.toHaveBeenCalled();
-  });
-
-  it("sem code nenhum: recusa em vez de tela em branco", async () => {
-    const { GET } = await comSupabase({ troca: { data: null, error: null } });
-
-    const res = await GET(requisicao(""));
-
-    expect(await destino(res)).toBe("/login?error=entrada_com_google");
     expect(vi.mocked(createClient)).not.toHaveBeenCalled();
   });
 
@@ -290,7 +281,7 @@ describe("GET /auth/callback", () => {
     expect(vi.mocked(decidirConviteDoSignup)).not.toHaveBeenCalled();
   });
 
-  it("ramo anônimo não escreve no rastro: sem `code` não há linha de auditoria", async () => {
+  it("ramo anônimo não escreve no rastro: sem sessão não há linha de auditoria", async () => {
     const { GET } = await comSupabase({ troca: { data: null, error: null } });
 
     const res = await GET(requisicao(""));
@@ -420,7 +411,7 @@ describe("GET /auth/callback", () => {
     // verificador de PKCE da IDA, cercado em
     // `tests/unit/entrada-com-google-verificador-viaja.test.ts`).
     const { GET } = await comSupabase({
-      troca: { data: null, error: { message: "PKCE code verifier not found in storage" } },
+      troca: { data: null, error: { message: "Auth session missing!" } },
     });
 
     const res = await GET(requisicao("code=abc"));

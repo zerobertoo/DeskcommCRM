@@ -261,7 +261,5 @@ function montarAuth(
       }
       return { data: {}, error: null };
     },
-    signInWithOAuth: naoConvertido("signInWithOAuth"),
-    exchangeCodeForSession: naoConvertido("exchangeCodeForSession"),
   };
 }

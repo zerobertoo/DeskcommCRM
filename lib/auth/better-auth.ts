@@ -39,6 +39,13 @@ function criarAuth() {
       cookiePrefix: "crm",
       useSecureCookies: cookieSecure(),
       defaultCookieAttributes: { sameSite: "strict", httpOnly: true },
+      // A volta do Google é navegação de outro site: cookie Strict não viaja e o
+      // estado do OAuth se perderia (issue #1388). Só o estado é Lax; a sessão
+      // segue Strict e chega ao app pela ponte /auth/google-ponte.
+      cookies: {
+        state: { attributes: { sameSite: "lax" } },
+        oauth_state: { attributes: { sameSite: "lax" } },
+      },
     },
     user: {
       modelName: "users",
@@ -57,6 +64,8 @@ function criarAuth() {
     },
     account: {
       modelName: "accounts",
+      // e-mail do Google é verificado: entra na conta que já existe com esse e-mail
+      accountLinking: { enabled: true, trustedProviders: ["google"] },
       fields: {
         accountId: "account_id",
         providerId: "provider_id",
@@ -74,6 +83,9 @@ function criarAuth() {
       modelName: "verifications",
       fields: { expiresAt: "expires_at", createdAt: "created_at", updatedAt: "updated_at" },
     },
+    socialProviders: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+      : {},
     plugins: [
       admin({
         schema: {

@@ -32,8 +32,12 @@
  */
 import { safeNext } from "@/lib/auth/safe-next";
 
-/** Onde o GoTrue devolve o navegador. Tem de estar em PUBLIC_PATHS. */
-export const CAMINHO_DO_RETORNO_DO_GOOGLE = "/auth/callback";
+/**
+ * Onde o Better Auth devolve o navegador depois de gravar a sessão. É uma ponte
+ * (app/auth/google-ponte): a navegação vem do Google, o cookie Strict não viaja, e
+ * a ponte reabre `/auth/callback` por navegação interna. Tem de estar em PUBLIC_PATHS.
+ */
+export const CAMINHO_DO_RETORNO_DO_GOOGLE = "/auth/google-ponte";
 
 export interface DestinoDoRetornoDoGoogle {
   next?: string | null;

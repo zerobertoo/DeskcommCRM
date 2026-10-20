@@ -23,6 +23,8 @@ export const PUBLIC_PATHS: RegExp[] = [
   // `createClientDeEntradaComGoogle`. Âncora `$` de propósito: nenhum sub-path
   // futuro nasce público de carona.
   /^\/auth\/callback$/,
+  // Ponte da volta do Google: só reabre /auth/callback por navegação interna.
+  /^\/auth\/google-ponte$/,
   // Retorno de OAuth social: documento público sem efeitos que reconecta a
   // navegação interna para manter os cookies de sessão sob SameSite=Strict.
   /^\/auth\/social-return$/,

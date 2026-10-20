@@ -72,7 +72,6 @@ import { env } from "@/lib/env";
  */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
-  const code = url.searchParams.get("code");
   const next = url.searchParams.get("next");
   const convite = url.searchParams.get("convite");
   const requestId = request.headers.get("x-request-id");
@@ -114,26 +113,13 @@ export async function GET(request: NextRequest) {
     return redirectTo("/login?error=entrada_com_google_cancelada");
   }
 
-  if (!code) {
-    return redirectTo("/login?error=entrada_com_google");
-  }
-
-  // O cliente de sempre (jar Strict): o verificador já viajou até aqui, e é este
-  // que grava o cookie de SESSÃO.
+  // A sessão já foi gravada pelo Better Auth em /api/auth/callback/google; a
+  // ponte (/auth/google-ponte) a trouxe até aqui por navegação interna. Sem
+  // sessão, quem chega não provou nada: volta para o login.
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.getUser();
 
   if (error || !data?.user) {
-    await audit({
-      action: "auth.google_signin_failed",
-      metadata: {
-        motivo: "troca_do_code_falhou",
-        // Texto de terceiro indo para uma tabela append-only: teto explícito, em
-        // vez de confiar no tamanho que o provedor decidir mandar.
-        reason: (error?.message ?? "no_user").slice(0, 200),
-      },
-      requestId,
-    });
     return redirectTo("/login?error=entrada_com_google");
   }
 

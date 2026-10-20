@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { createClientDeEntradaComGoogle } from "@/lib/supabase/server";
+import { auth } from "@/lib/auth/better-auth";
 import { urlDeRetornoDoGoogle } from "@/lib/auth/entrada-com-google";
 import { estadoDoProvedorGoogle } from "@/lib/auth/provedor-google";
 import { audit } from "@/lib/audit";
@@ -85,12 +85,23 @@ export async function signInWithGoogle(
     return { ok: false, error: "google_indisponivel" };
   }
 
-  const supabase = await createClientDeEntradaComGoogle();
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: urlDeRetornoDoGoogle(env.NEXT_PUBLIC_APP_URL, params) },
-  });
+  // O Better Auth grava o estado do OAuth (cookie Lax) e devolve a URL do Google;
+  // `disableRedirect` deixa o redirect para o `redirect()` abaixo.
+  let data: { url?: string } | null = null;
+  let error: { message?: string } | null = null;
+  try {
+    data = await auth().api.signInSocial({
+      body: {
+        provider: "google",
+        callbackURL: urlDeRetornoDoGoogle(env.NEXT_PUBLIC_APP_URL, params),
+        errorCallbackURL: `${env.NEXT_PUBLIC_APP_URL}/login?error=entrada_com_google`,
+        disableRedirect: true,
+      },
+      headers: hdrs,
+    });
+  } catch (e) {
+    error = { message: e instanceof Error ? e.message : String(e) };
+  }
 
   if (error || !data?.url) {
     // "Unsupported provider: provider is not enabled" é o que o GoTrue responde
