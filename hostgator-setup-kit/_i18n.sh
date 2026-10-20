@@ -372,8 +372,8 @@ identifica su red y pon TRAEFIK_NETWORK=<nombre> en el .env antes de volver a in
   ["Aplicando o schema no Supabase (baseline.sql)"]="Aplicando el esquema en Supabase (baseline.sql)"
 
   # ── install.sh: aplicación del baseline.sql ──────────────────────────────
-  ["✓ extensões (vector, citext, pg_trgm) habilitadas no public"]="✓ extensiones (vector, citext, pg_trgm) habilitadas en public"
-  ["⚠ não consegui habilitar as extensões — o schema pode falhar abaixo."]="⚠ no pude habilitar las extensiones — el esquema puede fallar más abajo."
+  ["✓ banco preparado para o baseline (papéis, schema auth e extensões)"]="✓ base de datos preparada para el baseline (roles, esquema auth y extensiones)"
+  ["⚠ não consegui preparar o banco (scripts/selfhost-prelude.sql) — o schema pode falhar abaixo."]="⚠ no pude preparar la base de datos (scripts/selfhost-prelude.sql) — el esquema puede fallar más abajo."
   ["  Supabase próprio? Criar extensão exige o dono do banco: rode de novo com"]="  ¿Supabase propio? Crear una extensión requiere ser dueño de la base de datos: vuelve a ejecutar esto con"
   ["• schema já existe — re-aplicando em modo update (erros 'já existe' são esperados e ficam no log)"]="• el esquema ya existe — reaplicando en modo actualización (errores 'ya existe' son esperados y quedan en el log)"
   ["✓ schema re-aplicado (apêndice de migrations incluído)"]="✓ esquema reaplicado (apéndice de migrations incluido)"

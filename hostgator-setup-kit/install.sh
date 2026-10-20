@@ -2037,15 +2037,13 @@ step "$(t "Aplicando o schema no Supabase (baseline.sql)")"
 # string do app é — por recomendação nossa — uma role menor. Sem
 # `SUPABASE_DB_ADMIN_URL` declarada as duas são a mesma, que é o caso da nuvem.
 if [ -f supabase/baseline.sql ]; then
-  # O baseline é um pg_dump: referencia public.vector, public.citext e gin_trgm_ops
-  # (pg_trgm) mas NÃO cria as extensões. Supabase não as habilita no schema public por
-  # padrão — criamos aqui, senão o schema quebra no meio (ex.: "type public.vector does
-  # not exist"). Idempotente (if not exists).
-  pg_container postgres:17-alpine psql "$(url_do_schema)" -v ON_ERROR_STOP=1 -c \
-    "create extension if not exists vector with schema public; create extension if not exists citext with schema public; create extension if not exists pg_trgm with schema public;" \
-    >/dev/null 2>&1 \
-    && c_grn "$(t "✓ extensões (vector, citext, pg_trgm) habilitadas no public")" \
-    || { c_ylw "$(t "⚠ não consegui habilitar as extensões — o schema pode falhar abaixo.")"
+  # O baseline é um pg_dump: supõe os papéis anon/authenticated/service_role, o
+  # schema `auth` e as extensões (vector, citext, pg_trgm…), e não cria nada
+  # disso. Quem cria é o prelude — o mesmo arquivo do gate `test:db`.
+  # Idempotente.
+  aplicar_prelude_do_banco "$PROJECT_DIR/scripts/selfhost-prelude.sql" >/dev/null 2>&1 \
+    && c_grn "$(t "✓ banco preparado para o baseline (papéis, schema auth e extensões)")" \
+    || { c_ylw "$(t "⚠ não consegui preparar o banco (scripts/selfhost-prelude.sql) — o schema pode falhar abaixo.")"
          c_ylw "$(t "  Supabase próprio? Criar extensão exige o dono do banco: rode de novo com")"
          c_ylw "  SUPABASE_DB_ADMIN_URL='postgresql://<dono>:<senha>@<host>:5432/postgres'"; }
   SCHEMA_LOG="$PROJECT_DIR/baseline-apply.log"
@@ -2086,6 +2084,7 @@ if [ -f supabase/baseline.sql ]; then
      — ela roda só o schema e NÃO é gravada no .env dos contêineres." "$SCHEMA_LOG")"
     fi
   fi
+  avisar_postgrest
 
   # Verificação real, não wishful thinking: o app precisa das tabelas core.
   n_tables="$(pg_container postgres:17-alpine psql "$(url_do_schema)" -tAc \

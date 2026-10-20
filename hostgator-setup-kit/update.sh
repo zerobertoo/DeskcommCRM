@@ -358,10 +358,11 @@ if [ -f supabase/baseline.sql ]; then
   # veria o erro do navegador, que e o desfecho que esta onda existe para tirar.
   manutencao_sobe
   pausar_o_que_fala_com_o_banco
-  # Extensões que o schema exige (idempotente; iguais ao install.sh).
-  pg_container postgres:17-alpine psql "$(url_do_schema)" -c \
-    "create extension if not exists vector with schema public; create extension if not exists citext with schema public; create extension if not exists pg_trgm with schema public;" \
-    >/dev/null 2>&1 || true
+  # Papéis, schema `auth`, default ACL e extensões que o baseline supõe
+  # (idempotente; o mesmo passo do install.sh). Um prelude novo chega assim a
+  # quem já instalou.
+  aplicar_prelude_do_banco "$PROJECT_DIR/scripts/selfhost-prelude.sql" >/dev/null 2>&1 \
+    || c_ylw "⚠ não consegui re-aplicar scripts/selfhost-prelude.sql — sigo para o baseline."
 
   # ── O LOG DO BANCO FICA GUARDADO ──────────────────────────────────────────
   #
@@ -393,6 +394,7 @@ if [ -f supabase/baseline.sql ]; then
     c_ylw "  O app pode ainda funcionar."
     orientar_banco_incompleto
   fi
+  avisar_postgrest
   # ── E AS REGRAS DE ISOLAMENTO SÃO CONFERIDAS ──────────────────────────────
   #
   # ## Por que isto existe

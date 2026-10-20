@@ -1955,6 +1955,24 @@ url_do_schema() {
 # alcance de uma role de app com grants só em `public`.
 psql_run() { pg_container -i postgres:17-alpine psql "$(url_do_schema)" -v ON_ERROR_STOP=1 "$@"; }
 
+# ── Banco próprio: o que vem antes e depois do baseline ─────────────────────
+# aplicar_prelude_do_banco <selfhost-prelude.sql>: papéis, schema `auth`,
+# default ACL e extensões que o baseline (um pg_dump) supõe existir. Idempotente:
+# roda em todo install e update, antes do baseline, e cobre o `create extension`
+# que estes dois scripts faziam sozinhos.
+aplicar_prelude_do_banco() {
+  pg_container -i -v "$1:/prelude.sql:ro" postgres:17-alpine \
+    psql "$(url_do_schema)" -v ON_ERROR_STOP=1 -q -f /prelude.sql
+}
+
+# O PostgREST guarda o schema em cache: sem o aviso, tabela ou função nova do
+# baseline responde 404 até ele reiniciar. Falha aqui não para nada — o cache
+# também se renova quando o contêiner reinicia.
+avisar_postgrest() {
+  pg_container postgres:17-alpine psql "$(url_do_schema)" -qc "notify pgrst, 'reload schema'" \
+    >/dev/null 2>&1 || true
+}
+
 # ── O teste TLS do kit (#829) ────────────────────────────────────────────────
 #
 # A issue quer duas metades, e esta é a segunda: com a CA declarada o teste
@@ -2460,6 +2478,61 @@ completar_segredos_da_voz() {  # completar_segredos_da_voz [envfile]
     criados="$criados $chave"
   done
 
+  printf '%s' "${criados# }"
+}
+
+# ── Banco próprio (fork sem a plataforma Supabase) ──────────────────────────
+# O compose sobe db + postgrest + gateway. As "chaves do Supabase" passam a ser
+# JWTs HS256 assinados com PGRST_JWT_SECRET, que o PostgREST valida — o mesmo
+# formato que o Supabase emite, por isso o app não muda.
+
+# base64url sem padding (RFC 7515)
+_base64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+
+# jwt_de_papel <segredo> <anon|service_role>: chave de papel, sem `exp` (de longa
+# duração, como as do Supabase). Só os dois papéis de chave: `authenticated` é
+# de sessão, e quem o emite é o app, com `sub` e validade curta.
+jwt_de_papel() {
+  local segredo="$1" papel="$2" cabecalho corpo assinatura
+  if [ "${#segredo}" -lt 32 ]; then
+    echo "PGRST_JWT_SECRET precisa de pelo menos 32 caracteres." >&2; return 1
+  fi
+  case "$papel" in
+    anon|service_role) ;;
+    *) echo "papel de chave tem de ser anon ou service_role (veio '$papel')." >&2; return 1 ;;
+  esac
+  cabecalho="$(printf '%s' '{"alg":"HS256","typ":"JWT"}' | _base64url)"
+  corpo="$(printf '{"role":"%s","iss":"deskcomm","iat":%s}' "$papel" "$(date +%s)" | _base64url)"
+  assinatura="$(printf '%s' "$cabecalho.$corpo" | openssl dgst -sha256 -hmac "$segredo" -binary | _base64url)"
+  printf '%s.%s.%s' "$cabecalho" "$corpo" "$assinatura"
+}
+
+# garantir_credenciais_do_banco_proprio <envfile>: preenche o que está VAZIO ou
+# ausente — senha do postgres, segredo do PostgREST e as duas chaves de papel —
+# e nunca troca um valor presente (o update re-executa; trocar a senha ou o
+# segredo derrubaria o banco ou todas as sessões). Chaves vazias com segredo
+# presente saem desse segredo. Imprime as chaves geradas.
+garantir_credenciais_do_banco_proprio() {
+  local envfile="$1" criados="" segredo
+  [ -f "$envfile" ] || { echo "arquivo $envfile não existe." >&2; return 1; }
+  _valor() { grep -E "^$1=" "$envfile" | tail -1 | cut -d= -f2- || true; }
+
+  # hex só: a senha entra numa URI de conexão (postgres://authenticator:<senha>@db)
+  if [ -z "$(_valor POSTGRES_PASSWORD)" ]; then
+    set_env_var "$envfile" POSTGRES_PASSWORD "$(openssl rand -hex 24)"; criados="$criados POSTGRES_PASSWORD"
+  fi
+  if [ -z "$(_valor PGRST_JWT_SECRET)" ]; then
+    set_env_var "$envfile" PGRST_JWT_SECRET "$(openssl rand -hex 32)"; criados="$criados PGRST_JWT_SECRET"
+  fi
+  segredo="$(_valor PGRST_JWT_SECRET)"
+  if [ -z "$(_valor NEXT_PUBLIC_SUPABASE_ANON_KEY)" ]; then
+    set_env_var "$envfile" NEXT_PUBLIC_SUPABASE_ANON_KEY "$(jwt_de_papel "$segredo" anon)" || return 1
+    criados="$criados NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  fi
+  if [ -z "$(_valor SUPABASE_SERVICE_ROLE_KEY)" ]; then
+    set_env_var "$envfile" SUPABASE_SERVICE_ROLE_KEY "$(jwt_de_papel "$segredo" service_role)" || return 1
+    criados="$criados SUPABASE_SERVICE_ROLE_KEY"
+  fi
   printf '%s' "${criados# }"
 }
 
