@@ -47,7 +47,7 @@ export async function emitirTokenDoUsuario(
   })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject(dados.userId)
-    .setIssuer("deskcomm")
+    .setIssuer("crm")
     .setIssuedAt(agora)
     .setExpirationTime(expiraEm)
     .sign(segredo());
@@ -56,6 +56,6 @@ export async function emitirTokenDoUsuario(
 
 /** Confere assinatura, emissor e validade; devolve os claims ou lança. */
 export async function verificarToken(token: string) {
-  const { payload } = await jwtVerify(token, segredo(), { issuer: "deskcomm", algorithms: ["HS256"] });
+  const { payload } = await jwtVerify(token, segredo(), { issuer: "crm", algorithms: ["HS256"] });
   return payload;
 }

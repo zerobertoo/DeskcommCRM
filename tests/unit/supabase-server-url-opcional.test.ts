@@ -122,6 +122,10 @@ describe("urlDoSupabaseNoServidor — PRESENTE aponta o servidor para a URL nova
   it("presente: o client de servidor pede à URL de servidor e fica na pública", async () => {
     vi.doMock("next/headers", () => ({
       cookies: async () => ({ getAll: () => [], set: () => {} }),
+      headers: async () => new Headers(),
+    }));
+    vi.doMock("@/lib/auth/compat/usuario-logado", () => ({
+      criarAuthDoUsuario: () => ({ auth: {}, token: async () => null }),
     }));
     vi.doMock("@/lib/env", () => mockDoEnv({ SUPABASE_SERVER_URL: PRIVADA }));
 
@@ -160,7 +164,8 @@ describe("urlDoSupabaseNoServidor — PRESENTE aponta o servidor para a URL nova
     expect(alvos[0]).toBe(`${PRIVADA}/storage/v1/object/sign/b/p.png`);
   });
 
-  it("presente: o proxy valida a sessão contra a URL de servidor", async () => {
+  // Sai com o GoTrue: o proxy valida a sessão no banco (Better Auth), não numa URL de servidor.
+  it.skip("presente: o proxy valida a sessão contra a URL de servidor", async () => {
     // O `proxy` (Edge) é quem valida o JWT de TODA requisição: se o `getUser`
     // dele não alcançar o Kong, toda navegação de uma instalação com Kong
     // privado cai para o login. A BASE continua pública (#1786) — o que leva a
@@ -380,9 +385,8 @@ describe("a URL de servidor não vaza para o browser", () => {
 
 describe("a variável é lida nos três pontos de servidor, e nowhere menos", () => {
   const pontosDeLeitura = [
-    "lib/supabase/server.ts",
+    "lib/supabase/cliente-do-usuario.ts",
     "lib/supabase/admin.ts",
-    "proxy.ts",
     "app/api/v1/health/route.ts",
   ];
 
@@ -401,9 +405,8 @@ describe("a variável é lida nos três pontos de servidor, e nowhere menos", ()
     // for adicionado DE PROPÓSITO, este teste manda tirá-lo daqui.
     const EXTRA = ["lib/agent-engine/agent/request-deps.ts", "workers/agent-worker/main.ts"];
     const todos = [
-      "lib/supabase/server.ts",
+      "lib/supabase/cliente-do-usuario.ts",
       "lib/supabase/admin.ts",
-      "proxy.ts",
       "app/api/v1/health/route.ts",
       ...EXTRA,
     ];

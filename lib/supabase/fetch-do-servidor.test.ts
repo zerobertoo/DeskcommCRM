@@ -42,6 +42,13 @@ vi.mock("@/lib/env", () => ({
 // "sem sessão", que é o estado de quem clica no login com Google.
 vi.mock("next/headers", () => ({
   cookies: async () => ({ getAll: () => [], set: () => {}, delete: () => {} }),
+  headers: async () => new Headers(),
+}));
+
+// Sem cookie não há sessão: o client vai com a chave anon e a consulta ao banco
+// de auth nem acontece. O mock evita abrir um pool de verdade neste teste.
+vi.mock("@/lib/auth/compat/usuario-logado", () => ({
+  criarAuthDoUsuario: () => ({ auth: {}, token: async () => null }),
 }));
 
 /** Chamadas que o SDK fez — é por aqui que se vê PRA ONDE a requisição foi. */
@@ -82,7 +89,8 @@ describe("com SUPABASE_SERVER_URL preenchida, os LINKS continuam na origem públ
     expect(destinos[0]).toContain(`${V.INTERNA}/storage/v1/object/sign/b/p.png`);
   });
 
-  it("signInWithOAuth devolve data.url na pública (login com Google)", async () => {
+  // Sai com o GoTrue: o login com Google passa a ser do Better Auth (sem /auth/v1/authorize).
+  it.skip("signInWithOAuth devolve data.url na pública (login com Google)", async () => {
     const servidor = await createClientDeEntradaComGoogle();
 
     const { data, error } = await servidor.auth.signInWithOAuth({
@@ -130,10 +138,11 @@ describe("com SUPABASE_SERVER_URL preenchida, os LINKS continuam na origem públ
   it("proxy.ts liga o mesmo fetch de desvio", () => {
     const fonte = readFileSync(join(__dirname, "..", "..", "proxy.ts"), "utf8");
 
-    expect(fonte).toContain("fetchDoServidor(");
-    expect(fonte).toContain(
+    expect(fonte).toContain("criarClienteDoUsuario(");
+    const cliente = readFileSync(join(__dirname, "cliente-do-usuario.ts"), "utf8");
+    expect(cliente).toContain("fetchDoServidor(");
+    expect(cliente).toContain(
       "urlDoSupabaseNoServidor(env.SUPABASE_SERVER_URL, env.NEXT_PUBLIC_SUPABASE_URL)",
     );
-    expect(fonte).toContain("env.NEXT_PUBLIC_SUPABASE_URL,");
   });
 });

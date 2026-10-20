@@ -2502,7 +2502,7 @@ jwt_de_papel() {
     *) echo "papel de chave tem de ser anon ou service_role (veio '$papel')." >&2; return 1 ;;
   esac
   cabecalho="$(printf '%s' '{"alg":"HS256","typ":"JWT"}' | _base64url)"
-  corpo="$(printf '{"role":"%s","iss":"deskcomm","iat":%s}' "$papel" "$(date +%s)" | _base64url)"
+  corpo="$(printf '{"role":"%s","iss":"crm","iat":%s}' "$papel" "$(date +%s)" | _base64url)"
   assinatura="$(printf '%s' "$cabecalho.$corpo" | openssl dgst -sha256 -hmac "$segredo" -binary | _base64url)"
   printf '%s.%s.%s' "$cabecalho" "$corpo" "$assinatura"
 }

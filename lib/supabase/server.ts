@@ -5,75 +5,16 @@
  * backend), NUNCA `getSession()` (confia no cookie local sem revalidar).
  */
 
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { cookieSecure } from "@/lib/supabase/cookie-secure";
-import { cookies } from "next/headers";
-import { env } from "@/lib/env";
-import { fetchDoServidor } from "@/lib/supabase/fetch-do-servidor";
-import { urlDoSupabaseNoServidor } from "@/lib/supabase/url-do-servidor";
+import { headers } from "next/headers";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { criarClienteDoUsuario } from "@/lib/supabase/cliente-do-usuario";
 
-/**
- * Tudo o que vale para TODO cookie deste cliente, menos o `sameSite` — que é
- * justamente o que muda entre a sessão e o verificador de PKCE (ver
- * `createClientDeEntradaComGoogle`).
- *
- * ⚠️ Precisa ser FUNÇÃO, não constante de módulo: `cookieSecure()` lê
- * `env.NEXT_PUBLIC_APP_URL` em runtime, e quem importa este arquivo (direto ou
- * por `lib/audit`) costuma mockar `@/lib/env` no teste. Constante de módulo
- * executa no IMPORT — antes do mock existir — e derruba a suíte inteira com
- * "Cannot access 'envMock' before initialization".
- */
-function opcoesDeCookie(sameSite: "strict" | "lax") {
-  // D-01.01: cookie name canônico alinhado ao middleware.
-  return {
-    name: "sb-deskcomm-auth",
-    sameSite,
-    httpOnly: true,
-    secure: cookieSecure(),
-    path: "/",
-  };
-}
-
-async function clienteDeServidor(sameSite: "strict" | "lax") {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    // #1082: a BASE fica na URL pública, porque é dela que o SDK monta os links
-    // que este cliente entrega a terceiros — `signInWithOAuth` → `data.url`
-    // (login com Google) e o storage → `signedUrl` (mídia, avatar, PDF da LGPD).
-    // O endereço interno entra SÓ no transporte, no `global.fetch` abaixo: a
-    // requisição vai pelo caminho curto, o link sai público.
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      global: {
-        fetch: fetchDoServidor(
-          urlDoSupabaseNoServidor(env.SUPABASE_SERVER_URL, env.NEXT_PUBLIC_SUPABASE_URL),
-          env.NEXT_PUBLIC_SUPABASE_URL,
-        ),
-      },
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          } catch {
-            // setAll pode ser chamado de Server Component; nesse caso, ignoramos.
-            // Refresh de sessão acontece no middleware do Next.
-          }
-        },
-      },
-      cookieOptions: opcoesDeCookie(sameSite),
-    },
-  );
+function clienteDeServidor(): SupabaseClient {
+  return criarClienteDoUsuario(() => headers());
 }
 
 export async function createClient() {
-  return clienteDeServidor("strict");
+  return clienteDeServidor();
 }
 
 /**
@@ -108,5 +49,5 @@ export async function createClient() {
  * não uma mudança de postura.)
  */
 export async function createClientDeEntradaComGoogle() {
-  return clienteDeServidor("lax");
+  return clienteDeServidor();
 }

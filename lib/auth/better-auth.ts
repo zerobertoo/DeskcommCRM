@@ -11,7 +11,7 @@
 
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
-import { admin, twoFactor } from "better-auth/plugins";
+import { admin } from "better-auth/plugins";
 import { Pool } from "pg";
 import { env } from "@/lib/env";
 import { cookieSecure } from "@/lib/supabase/cookie-secure";
@@ -35,7 +35,7 @@ function criarAuth() {
     emailAndPassword: { enabled: true },
     advanced: {
       database: { generateId: "uuid" },
-      cookiePrefix: "deskcomm",
+      cookiePrefix: "crm",
       useSecureCookies: cookieSecure(),
       defaultCookieAttributes: { sameSite: "strict", httpOnly: true },
     },
@@ -78,20 +78,6 @@ function criarAuth() {
         schema: {
           user: { fields: { banReason: "ban_reason", banExpires: "ban_expires" } },
           session: { fields: { impersonatedBy: "impersonated_by" } },
-        },
-      }),
-      twoFactor({
-        schema: {
-          user: { fields: { twoFactorEnabled: "two_factor_enabled" } },
-          twoFactor: {
-            modelName: "two_factors",
-            fields: {
-              backupCodes: "backup_codes",
-              userId: "user_id",
-              failedVerificationCount: "failed_verification_count",
-              lockedUntil: "locked_until",
-            },
-          },
         },
       }),
       nextCookies(), // por último: grava o cookie em Server Actions

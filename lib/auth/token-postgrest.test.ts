@@ -29,7 +29,7 @@ describe("token do PostgREST", () => {
   it("recusa token assinado com outro segredo", async () => {
     const falso = await new SignJWT({ role: "service_role" })
       .setProtectedHeader({ alg: "HS256" })
-      .setIssuer("deskcomm")
+      .setIssuer("crm")
       .sign(new TextEncoder().encode("x".repeat(40)));
     await expect(verificarToken(falso)).rejects.toThrow();
   });
@@ -37,7 +37,7 @@ describe("token do PostgREST", () => {
   it("recusa token vencido", async () => {
     const vencido = await new SignJWT({ role: "authenticated" })
       .setProtectedHeader({ alg: "HS256" })
-      .setIssuer("deskcomm")
+      .setIssuer("crm")
       .setExpirationTime(Math.floor(Date.now() / 1000) - 60)
       .sign(new TextEncoder().encode(SEGREDO));
     await expect(verificarToken(vencido)).rejects.toThrow();

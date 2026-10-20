@@ -1,17 +1,12 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { cookieSecure } from "@/lib/supabase/cookie-secure";
+import { criarClienteDoUsuario } from "@/lib/supabase/cliente-do-usuario";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
-import { fetchDoServidor } from "@/lib/supabase/fetch-do-servidor";
-import { urlDoSupabaseNoServidor } from "@/lib/supabase/url-do-servidor";
 import { isPublicPath } from "@/lib/auth/public-paths";
 import { CABECALHO_SEM_CSS, PARAMETRO_SEM_CSS } from "@/lib/branding/sem-css-personalizado";
 import {
   verifyImpersonateCookieEdge,
   IMPERSONATE_COOKIE_NAME_EDGE,
 } from "@/lib/impersonate/cookie-edge";
-
-const COOKIE_NAME = "sb-deskcomm-auth";
 
 export async function proxy(request: NextRequest) {
   // Saída de emergência do CSS personalizado. ANTES do `NextResponse.next`: ele
@@ -58,39 +53,7 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  const supabase = createServerClient(
-    // #1082: base na URL pública, endereço interno só no transporte (ver
-    // `lib/supabase/fetch-do-servidor.ts`). O middleware não gera link, mas
-    // segue a mesma regra dos outros dois clients — um desenho só.
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      global: {
-        fetch: fetchDoServidor(
-          urlDoSupabaseNoServidor(env.SUPABASE_SERVER_URL, env.NEXT_PUBLIC_SUPABASE_URL),
-          env.NEXT_PUBLIC_SUPABASE_URL,
-        ),
-      },
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value);
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-      cookieOptions: {
-        name: COOKIE_NAME,
-        sameSite: "strict",
-        httpOnly: true,
-        secure: cookieSecure(),
-        path: "/",
-      },
-    },
-  );
+  const supabase = criarClienteDoUsuario(() => request.headers);
 
   // Validate JWT server-side (NEVER use getSession on backend per CLAUDE.md).
   const {

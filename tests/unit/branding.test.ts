@@ -302,11 +302,6 @@ const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
       "nome do cookie de sessão. Renomear invalida a sessão de todo usuário logado no momento da atualização — o `update.sh` do clone viraria um logout em massa",
     marcas: ["sb-deskcomm-auth"],
   },
-  "lib/supabase/server.ts": {
-    categoria: "INFRA",
-    motivo: "o mesmo cookie de sessão, lido no servidor; tem de casar com o do browser",
-    marcas: ["sb-deskcomm-auth"],
-  },
   "lib/impersonate/cookie.ts": {
     categoria: "INFRA",
     motivo:

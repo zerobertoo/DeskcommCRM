@@ -34,7 +34,8 @@ const FONTE_DA_ACTION = readFileSync("app/actions/auth/signInWithGoogle.ts", "ut
 const FONTE_DO_CALLBACK = readFileSync("app/auth/callback/route.ts", "utf8");
 
 describe("o verificador de PKCE da entrada com Google viaja de volta", () => {
-  it("o cliente da ida grava com sameSite Lax — Strict não viaja na volta do Google", () => {
+  // Sai com o GoTrue: o estado do OAuth é do Better Auth. Esta cerca volta, reescrita, com a conversão do Google.
+  it.skip("o cliente da ida grava com sameSite Lax — Strict não viaja na volta do Google", () => {
     // A função existe e é ela que usa lax.
     expect(FONTE_DO_CLIENTE).toMatch(/export async function createClientDeEntradaComGoogle/);
     const corpo = FONTE_DO_CLIENTE.slice(

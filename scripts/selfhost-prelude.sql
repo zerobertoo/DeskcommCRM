@@ -150,10 +150,8 @@ create table if not exists auth.mfa_factors (
 -- Better Auth sobre o shim (fork sem a plataforma Supabase): ele grava usuário e
 -- sessão nestas mesmas tabelas, com uuid gerado pelo banco. Os nomes das colunas
 -- novas são mapeados em lib/auth/better-auth.ts. Segredo (hash de senha, TOTP)
--- mora em accounts/two_factors, que NÃO recebem grant: nenhum papel do PostgREST
+-- mora em accounts (e `mfa_factors.secret`), que NÃO recebem grant: nenhum papel do PostgREST
 -- as alcança, só o dono do banco (a conexão do Better Auth).
--- `mfa_factors` segue tabela por enquanto — vira view sobre `two_factors` quando
--- o fluxo de MFA for convertido, porque os invariantes ainda inserem nela.
 alter table auth.users add column if not exists name text not null default '';
 alter table auth.users add column if not exists email_verified boolean not null default false;
 alter table auth.users add column if not exists image text;
@@ -162,7 +160,9 @@ alter table auth.users add column if not exists role text;
 alter table auth.users add column if not exists banned boolean not null default false;
 alter table auth.users add column if not exists ban_reason text;
 alter table auth.users add column if not exists ban_expires timestamptz;
-alter table auth.users add column if not exists two_factor_enabled boolean not null default false;
+alter table auth.users add column if not exists raw_app_meta_data jsonb not null default '{}'::jsonb;
+alter table auth.users add column if not exists email_confirmed_at timestamptz;
+alter table auth.users add column if not exists last_sign_in_at timestamptz;
 
 -- GoTrue apaga sessão e fator junto com o usuário; sem o cascade, remover um
 -- usuário (teste, LGPD) falha na FK.
@@ -198,14 +198,13 @@ create table if not exists auth.verifications (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create table if not exists auth.two_factors (
-  id uuid primary key default gen_random_uuid(),
-  secret text not null, backup_codes text not null,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  verified boolean default true,
-  failed_verification_count int not null default 0,
-  locked_until timestamptz
-);
+-- TOTP é nosso (lib/auth/compat/mfa.ts), não o plugin twoFactor: o segredo mora
+-- aqui e, como em accounts, nenhum papel do PostgREST o lê.
+alter table auth.mfa_factors add column if not exists secret text;
+alter table auth.mfa_factors add column if not exists friendly_name text;
+alter table auth.mfa_factors add column if not exists created_at timestamptz not null default now();
+create unique index if not exists mfa_factors_user_friendly_name_key
+  on auth.mfa_factors (user_id, friendly_name) where friendly_name is not null;
 
 -- O baseline lê `raw_user_meta_data->>'full_name'`; o Better Auth grava `name`.
 create or replace function auth.fn_users_full_name() returns trigger
