@@ -16,7 +16,9 @@
  *   OWNER_ORG_NAME='Minha Empresa' npx tsx scripts/bootstrap-owner.ts
  */
 
+import { hashPassword } from "better-auth/crypto";
 import { createClient } from "@supabase/supabase-js";
+import { Pool } from "pg";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -85,25 +87,43 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-async function ensureOwnerUser(): Promise<string> {
-  const { data: list } = await admin.auth.admin.listUsers({ perPage: 200 });
-  const existing = list.users.find((u) => u.email === OWNER_EMAIL);
-  if (existing) {
-    await admin.auth.admin.updateUserById(existing.id, { password: OWNER_PASSWORD });
-    console.log(`[bootstrap] dono já existia, senha atualizada: ${existing.id}`);
-    return existing.id;
+/** Conexão com `auth.*` (o Better Auth é dono do schema; não há GoTrue para chamar). */
+const AUTH_DB_URL = env.AUTH_DB_URL || env.SUPABASE_DB_URL;
+if (!AUTH_DB_URL) throw new Error("Faltam AUTH_DB_URL / SUPABASE_DB_URL.");
+const authDb = new Pool({ connectionString: AUTH_DB_URL, max: 1 });
+
+/** Grava a senha na conta `credential` do usuário (cria a conta se ainda não existe). */
+async function gravarSenhaDoDono(userId: string): Promise<void> {
+  const hash = await hashPassword(OWNER_PASSWORD!);
+  const { rowCount } = await authDb.query(
+    "update auth.accounts set password = $2, updated_at = now() where user_id = $1 and provider_id = 'credential'",
+    [userId, hash],
+  );
+  if (!rowCount) {
+    await authDb.query(
+      "insert into auth.accounts (account_id, provider_id, user_id, password) values ($1::text, 'credential', $1::uuid, $2)",
+      [userId, hash],
+    );
   }
-  const { data, error } = await admin.auth.admin.createUser({
-    email: OWNER_EMAIL,
-    password: OWNER_PASSWORD,
-    email_confirm: true,
-    // O dono também nasce com a preferência: ele é o único que entra antes de
-    // existir organização resolvida na sessão, no primeiro login.
-    user_metadata: { full_name: "Dono", locale: APP_LOCALE },
-  });
-  if (error || !data?.user) throw new Error(`criar dono: ${error?.message}`);
-  console.log(`[bootstrap] dono criado: ${data.user.id}`);
-  return data.user.id;
+}
+
+async function ensureOwnerUser(): Promise<string> {
+  const existing = await authDb.query<{ id: string }>("select id from auth.users where email = $1", [
+    OWNER_EMAIL!.trim().toLowerCase(),
+  ]);
+  if (existing.rows[0]) {
+    await gravarSenhaDoDono(existing.rows[0].id);
+    console.log(`[bootstrap] dono já existia, senha atualizada: ${existing.rows[0].id}`);
+    return existing.rows[0].id;
+  }
+  const { rows } = await authDb.query<{ id: string }>(
+    `insert into auth.users (email, name, email_verified, email_confirmed_at, raw_user_meta_data)
+     values ($1, 'Dono', true, now(), $2::jsonb) returning id`,
+    [OWNER_EMAIL!.trim().toLowerCase(), JSON.stringify({ full_name: "Dono", locale: APP_LOCALE })],
+  );
+  await gravarSenhaDoDono(rows[0]!.id);
+  console.log(`[bootstrap] dono criado: ${rows[0]!.id}`);
+  return rows[0]!.id;
 }
 
 async function ensureOrg(ownerId: string): Promise<string> {
@@ -266,10 +286,12 @@ async function main(): Promise<void> {
   const orgId = await ensureOrg(ownerId);
   await ensureMembership(ownerId, orgId);
   await ensurePlatformAdmin(ownerId);
+  await authDb.end();
   console.log(`\n✅ Bootstrap completo.\n  dono: ${OWNER_EMAIL}\n  org:  ${orgId}\n  Faça login em ${env.NEXT_PUBLIC_APP_URL || "https://<seu-dominio>"} e conclua o onboarding.`);
 }
 
 main().catch((err) => {
   console.error("❌ Bootstrap falhou:", err);
+  void authDb.end();
   process.exit(1);
 });

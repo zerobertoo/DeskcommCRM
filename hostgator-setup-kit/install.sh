@@ -312,6 +312,12 @@ v_locale() {
 }
 
 v_supabase_url() {
+  # Banco próprio (BANCO_PROPRIO=1): a URL e as chaves vêm do wrapper, não de uma
+  # pessoa digitando, então não há erro de digitação a pegar nem GoTrue a provar.
+  if [ "${BANCO_PROPRIO:-0}" = "1" ]; then
+    case "$1" in http://*|https://*) return 0;; esac
+    echo "$(t "A URL precisa começar com http:// ou https://.")"; return 1
+  fi
   case "$1" in
     https://*.supabase.co) ;;
     # Supabase SELF-HOSTED (ex.: https://db-crm.exemplo.com.br). A prova é a
@@ -359,6 +365,11 @@ v_supabase_url() {
 # $2 = papel esperado ('anon' ou 'service_role')
 v_sb_key() {
   local key="$1" want="$2" url="${NEXT_PUBLIC_SUPABASE_URL:-}"
+  # Banco próprio: o JWT é assinado pelo wrapper com o PGRST_JWT_SECRET; só o papel é conferido.
+  if [ "${BANCO_PROPRIO:-0}" = "1" ]; then
+    [ "$(jwt_claim "$key" role)" = "$want" ] && return 0
+    echo "$(t "Essa chave não é a '{1}'." "$want")"; return 1
+  fi
   case "$key" in
     eyJ*)
       local role ref
@@ -2277,38 +2288,40 @@ PEND
 PEND
 }
 
-PENDENCIA_EMAIL="$(mktemp)"
-PENDENCIA_ARQUIVO="$PENDENCIA_EMAIL" \
-  SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN:-}" \
-  bash "$KIT_DIR/marca-emails.sh" --projeto "$PROJECT_DIR" || true
+# Sem GoTrue não há modelo de e-mail para empurrar: o link de acesso sai do próprio
+# app (lib/auth/compat/verificacao.ts). Sem pendência, a tela final não a menciona.
 
-# ── 8. Bootstrap do 1º dono (cria no Auth + promove via psql) ───────────────
+# ── 8. Bootstrap do 1º dono (cria em auth.users + promove via psql) ─────────
 step "$(t "Criando o primeiro admin ({1})" "$OWNER_EMAIL")"
-# 1) Cria o usuário no Supabase Auth. Se já existe, a API responde 422 — ignoramos
-#    (|| true): a re-execução é idempotente, o passo seguinte encontra o usuário.
-# No single-server o Caddy pode ainda estar emitindo o certificado: fala com o
-# gateway local, que já respondeu ao validador.
-curl -fsS -X POST "${SUPABASE_INTERNAL_URL:-${NEXT_PUBLIC_SUPABASE_URL}}/auth/v1/admin/users" \
-  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"${OWNER_EMAIL}\",\"password\":\"${OWNER_PASSWORD}\",\"email_confirm\":true,\"user_metadata\":{\"locale\":\"${APP_LOCALE:-pt-BR}\"}}" \
-  >/dev/null 2>&1 || true
+# Não há serviço de login para chamar: o Better Auth mora no app, que só sobe no
+# passo 9. O dono nasce direto em auth.users/auth.accounts, com o hash no formato
+# que o Better Auth verifica (hash-senha.mjs; a VPS não tem Node, então roda num
+# contêiner). A senha vai por variável de ambiente, nunca por argumento.
+SENHA_HASH="$(docker run --rm -e SENHA="$OWNER_PASSWORD" -v "$KIT_DIR/hash-senha.mjs:/hash-senha.mjs:ro" node:22-alpine node /hash-senha.mjs)" \
+  || die "$(t "Não consegui gerar o hash da senha do admin (o Docker baixou a imagem node:22-alpine?).")"
 
-# 2) Resolve o id direto do auth.users e cria org + membership + platform_admin.
-#    Resolver o uid DENTRO do SQL evita parsing frágil de JSON e funciona tanto para
-#    usuário recém-criado quanto para um que já existia (re-execução).
+# 2) Cria (ou atualiza) o dono e resolve o id dentro do SQL, o que funciona para
+#    usuário novo e para re-execução (a senha é regravada, como no bootstrap-owner.ts).
 pg_container -i postgres:17-alpine psql "$(url_do_schema)" -v ON_ERROR_STOP=1 <<SQL \
   && c_grn "$(t "✓ dono criado e promovido a super-admin")" \
-  || die "$(t "Não consegui promover o admin. Confira a service_role key, a URL e a connection string do Supabase.
-     Este passo lê auth.users e escreve em public: num Supabase próprio ele precisa do dono do
+  || die "$(t "Não consegui promover o admin. Confira a connection string do banco.
+     Este passo escreve em auth.users e em public: ele precisa do dono do
      banco — declare SUPABASE_DB_ADMIN_URL e rode de novo.")"
 do \$\$
 declare v_org uuid; v_uid uuid;
 begin
-  select id into v_uid from auth.users where email = '${OWNER_EMAIL}';
+  select id into v_uid from auth.users where email = lower('${OWNER_EMAIL}');
   if v_uid is null then
-    raise exception 'usuário % não encontrado no auth.users (a criação no Auth falhou?)', '${OWNER_EMAIL}';
+    insert into auth.users (email, name, email_verified, email_confirmed_at, raw_user_meta_data)
+    values (lower('${OWNER_EMAIL}'), 'Dono', true, now(),
+            jsonb_build_object('full_name', 'Dono', 'locale', '${APP_LOCALE:-pt-BR}'))
+    returning id into v_uid;
+  end if;
+  update auth.accounts set password = '${SENHA_HASH}', updated_at = now()
+   where user_id = v_uid and provider_id = 'credential';
+  if not found then
+    insert into auth.accounts (account_id, provider_id, user_id, password)
+    values (v_uid::text, 'credential', v_uid, '${SENHA_HASH}');
   end if;
   select id into v_org from public.organizations where slug='minha-empresa';
   if v_org is null then
