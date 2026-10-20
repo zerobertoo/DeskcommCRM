@@ -363,16 +363,15 @@ export async function triggerHandoff(
 
     // Step 4 — Realtime broadcast so the agent UI lights up immediately.
     try {
-      const channel = admin.channel(`org:${input.organizationId}:queue`);
-      await channel.send({
-        type: "broadcast",
-        event: "handoff_pending",
-        payload: {
+      const { error: broadcastErr } = await admin.rpc("fn_realtime_broadcast", {
+        p_channel: `org:${input.organizationId}:queue`,
+        p_event: "handoff_pending",
+        p_payload: {
           conversation_id: input.conversationId,
           reason: input.reason,
         },
-      });
-      await admin.removeChannel(channel);
+      } as never);
+      if (broadcastErr) throw new Error((broadcastErr as { message?: string }).message ?? "broadcast_failed");
     } catch (err) {
       logger.warn("[handoff-orchestrator] realtime broadcast failed", {
         conversation_id: input.conversationId,

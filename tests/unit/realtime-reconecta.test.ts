@@ -31,60 +31,35 @@ import { describe, expect, it } from "vitest";
  * tinha, e pela qual o cabeçalho dele já pagou.
  */
 
-const FONTE = readFileSync("hooks/realtime/useRealtimeChannel.ts", "utf8");
+const FONTE = readFileSync("hooks/realtime/conexao.ts", "utf8");
+const FONTE_DO_HOOK = readFileSync("hooks/realtime/useRealtimeChannel.ts", "utf8");
 
-describe("o canal volta sozinho", () => {
-  it("uma falha AGENDA nova tentativa — antes só anotava o estado", () => {
-    expect(FONTE).toMatch(/CHANNEL_ERROR" \|\| s === "TIMED_OUT" \|\| s === "CLOSED"/);
-    expect(FONTE, "a falha não agenda retomada").toMatch(/retomada = setTimeout\(/);
+describe("o canal volta sozinho (SSE)", () => {
+  it("o servidor recusar (EventSource CLOSED) AGENDA nova tentativa", () => {
+    expect(FONTE).toMatch(/readyState === EventSource\.CLOSED/);
+    expect(FONTE).toMatch(/retomada = setTimeout\(abrir, espera\)/);
   });
 
-  it("com recuo exponencial e TETO — rajada contra socket caído piora tudo", () => {
+  it("com recuo exponencial e TETO — rajada contra servidor caído piora tudo", () => {
     expect(FONTE).toMatch(/Math\.min\(30_000, 1_000 \* 2 \*\* tentativas\)/);
   });
 
-  it("monta canal NOVO a cada tentativa", () => {
-    // Reassinar o mesmo objeto devolve SUBSCRIBED e não entrega nada.
-    // Solta `active` ANTES de remover: o CLOSED síncrono do canal velho não pode
-    // passar pela guarda e armar outra retomada (ver
-    // `tests/unit/realtime-retomada-sem-timer-orfao.test.tsx`, que prende isso
-    // pelo comportamento).
-    expect(FONTE).toMatch(/const velho = active;\s*\n\s*active = null;\s*\n\s*if \(velho\) supabase\.removeChannel\(velho\);\s*\n\s*montar\(\);/);
-    expect(FONTE).toMatch(/supabase\.channel\(`\$\{channelName\}#\$\{tentativas\}`\)/);
-  });
-
-  it("ao voltar, FORÇA uma busca — o que passou não chega sozinho", () => {
-    // Esta é a parte que fecha o buraco de verdade. Sem ela o canal volta a
-    // funcionar para o PRÓXIMO evento e a tela segue sem o anterior.
-    expect(FONTE).toMatch(/handler\(\{ tipo: "reassinado" \}\)/);
+  it("ao voltar de uma queda, FORÇA uma busca — o que passou não chega sozinho", () => {
+    expect(FONTE).toMatch(/entregar\(\{ tipo: "reassinado" \}\)/);
   });
 
   it("só força quando VEIO de uma queda — a primeira assinatura não busca à toa", () => {
-    expect(FONTE).toMatch(/if \(tentativas > 0\) \{/);
+    expect(FONTE).toMatch(/if \(caiu\) \{[\s\S]{0,160}?reassinado/);
   });
 
-  it("descarta o canal velho que responde tarde", () => {
-    // Duas tentativas em voo: sem a comparação, a que chega atrasada
-    // sobrescreve o estado da que já está de pé.
-    // Dentro do callback do subscribe, não em qualquer lugar: a guarda também
-    // existe no `then` da auth, e a primeira versão deste caso passava verde com
-    // a do subscribe removida.
-    expect(FONTE).toMatch(/novo\.subscribe\(\(s\) => \{\s*\n\s*if \(cancelado \|\| active !== novo\) return;/);
+  it("a saída cancela o timer e fecha o fluxo — senão remonta canal de tela fechada", () => {
+    const saida = FONTE.slice(FONTE.indexOf("assinantes.size === 0"));
+    expect(saida).toMatch(/clearTimeout\(retomada\)/);
+    expect(saida).toMatch(/fonte\?\.close\(\)/);
   });
 
-  it("o timer é cancelado na saída — senão remonta canal de tela fechada", () => {
-    // No CLEANUP, não no agendamento: a mesma linha existe nos dois lugares, e
-    // a primeira versão deste caso passava com a do cleanup removida — que é
-    // justamente a que impede remontar canal de tela já fechada.
-    expect(FONTE).toMatch(/cancelado = true;\s*\n\s*if \(retomada\) clearTimeout\(retomada\);/);
-  });
-});
-
-describe("o primeiro join aguarda a autenticação compartilhada", () => {
-  it("não inventa timeout de auth nem assina anon em falha", () => {
-    expect(FONTE).not.toMatch(/AUTH_TIMEOUT_MS/);
-    expect(FONTE).toMatch(/await prepareRealtimeAuthentication\(\)/);
-    expect(FONTE).toMatch(/if \(cancelado\) return;/);
+  it("não autentica por conta própria: o cookie da requisição é a credencial", () => {
+    expect(FONTE + FONTE_DO_HOOK).not.toMatch(/setAuth|prepareRealtimeAuthentication/);
   });
 });
 
