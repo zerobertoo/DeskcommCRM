@@ -18,6 +18,7 @@
 
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
+import { armazenamento } from "@/lib/armazenamento/disco";
 import { criarAuthAdmin } from "@/lib/auth/compat/admin";
 import { fetchDoServidor } from "@/lib/supabase/fetch-do-servidor";
 import { urlDoSupabaseNoServidor } from "@/lib/supabase/url-do-servidor";
@@ -53,6 +54,8 @@ export function createAdminClient(): SupabaseClient {
 
   // O SDK falaria com /auth/v1/admin, que não existe sem o GoTrue.
   // `getSession` sem sessão: o SDK cai na chave de serviço (storage/realtime dependem disso).
+  // Arquivos em disco, não no Storage do Supabase (lib/armazenamento/disco.ts).
+  (_admin as unknown as { storage: unknown }).storage = armazenamento;
   (_admin as unknown as { auth: unknown }).auth = {
     admin: criarAuthAdmin(),
     getSession: async () => ({ data: { session: null }, error: null }),

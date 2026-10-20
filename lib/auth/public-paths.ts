@@ -25,6 +25,9 @@ export const PUBLIC_PATHS: RegExp[] = [
   /^\/auth\/callback$/,
   // Ponte da volta do Google: só reabre /auth/callback por navegação interna.
   /^\/auth\/google-ponte$/,
+  // Arquivos do armazenamento em disco (URL assinada por HMAC, ou bucket público):
+  // quem autoriza é a assinatura na query, nunca o cookie.
+  /^\/storage\/v1\/object\/(sign|public)\//,
   // Retorno de OAuth social: documento público sem efeitos que reconecta a
   // navegação interna para manter os cookies de sessão sob SameSite=Strict.
   /^\/auth\/social-return$/,

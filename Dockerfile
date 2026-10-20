@@ -115,6 +115,8 @@ ENV NODE_ENV=production \
 RUN apk add --no-cache ffmpeg
 # non-root
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+# Raiz dos arquivos enviados: o volume herda este dono quando nasce vazio.
+RUN mkdir -p /data/storage && chown nextjs:nodejs /data/storage
 # A versão que /api/v1/health reporta (invariante 7). Precisa vir por ARG: a
 # alternativa anterior era `process.env.npm_package_version`, que é `undefined`
 # sob `CMD ["node","server.js"]` — só existe quando o processo nasce de um

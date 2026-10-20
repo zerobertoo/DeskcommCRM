@@ -214,6 +214,8 @@ const schema = z.object({
    * sessão abre no ato. Substitui o `GOTRUE_MAILER_AUTOCONFIRM`. Padrão `false`.
    */
   AUTH_EMAIL_AUTOCONFIRM: z.string().optional().default(""),
+  /** Raiz dos arquivos (buckets são subpastas). Vazia, usa `.storage` no diretório atual; no compose é `/data/storage`. */
+  STORAGE_DIR: z.string().optional().default(""),
   /** Entrada com Google: ligada quando os dois existem (Better Auth, `socialProviders`). */
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),

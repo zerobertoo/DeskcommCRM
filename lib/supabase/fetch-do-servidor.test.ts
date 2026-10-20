@@ -20,6 +20,7 @@ import { createClient } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAdminClient } from "./admin";
+import { armazenamento } from "@/lib/armazenamento/disco";
 import { createClient as createClientDeServidor } from "./server";
 
 const V = vi.hoisted(() => ({
@@ -89,15 +90,10 @@ describe("com SUPABASE_SERVER_URL preenchida, os LINKS continuam na origem públ
     expect(destinos[0]).toContain(`${V.INTERNA}/storage/v1/object/sign/b/p.png`);
   });
 
-  it("o client admin (service role) segue a mesma regra", async () => {
-    const admin = createAdminClient();
-
-    const { data, error } = await admin.storage.from("b").createSignedUrl("p.png", 60);
-
-    expect(error).toBeNull();
-    expect(data?.signedUrl).toContain(V.PUBLICA);
-    expect(data?.signedUrl).not.toContain("kong:8000");
-    expect(destinos.some((d) => d.startsWith(V.INTERNA))).toBe(true);
+  it("o client admin guarda arquivos em disco, não no Storage do Supabase", () => {
+    // A URL assinada sai da origem pública por construção (lib/armazenamento/disco.ts,
+    // coberta em tests/unit/armazenamento-em-disco.test.ts): não há transporte interno a desviar.
+    expect(createAdminClient().storage).toBe(armazenamento);
   });
 
   /**

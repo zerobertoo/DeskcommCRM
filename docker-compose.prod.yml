@@ -56,8 +56,12 @@ services:
     # um serviço build-only é pulado pelo pull e NUNCA é atualizado. Aqui a
     # imagem continua vindo do registro.
     restart: unless-stopped
+    volumes:
+      # arquivos enviados (lib/armazenamento/disco.ts): perder o volume = perder os anexos
+      - app-storage:/data/storage
     env_file: .env
     environment:
+      STORAGE_DIR: /data/storage
       SUPABASE_DB_ADMIN_URL: ""
       # O `worker` deste arquivo drena o event_log em poucos segundos (2 s com
       # fila, até 10 s parado); o webhook de mensagem não precisa mais drenar a
@@ -123,8 +127,12 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     restart: unless-stopped
+    volumes:
+      # arquivos enviados (lib/armazenamento/disco.ts): perder o volume = perder os anexos
+      - app-storage:/data/storage
     env_file: .env
     environment:
+      STORAGE_DIR: /data/storage
       # dentro da rede do compose, o WAHA é o serviço 'waha' na porta interna 3000
       WAHA_API_BASE_URL: http://waha:3000
       SUPABASE_DB_ADMIN_URL: ""
@@ -517,6 +525,7 @@ services:
     networks: [internal, caddy-sites]
 
 volumes:
+  app-storage:
   db-data:
   waha-data:
   waha-media:
