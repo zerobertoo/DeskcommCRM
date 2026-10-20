@@ -1,5 +1,7 @@
 "use client";
 
+import { randomId } from "@/lib/random-id";
+
 /**
  * A ÚNICA conexão SSE da aba (`/api/realtime`), repartida entre todos os hooks
  * `useRealtimeChannel`. Um EventSource por hook estouraria o limite de 6 conexões por
@@ -26,7 +28,7 @@ interface Assinante {
   aoMudarEstado: (estado: EstadoDoFluxo) => void;
 }
 
-const cid = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2);
+const cid = randomId();
 const assinantes = new Map<string, Assinante>();
 let fonte: EventSource | null = null;
 let pronta = false;
@@ -48,7 +50,8 @@ function registrar(sid: string, a: Assinante) {
 }
 
 function abrir() {
-  if (fonte || assinantes.size === 0) return;
+  // sem EventSource (SSR, jsdom sem polyfill): fica em "connecting" e nada quebra
+  if (typeof EventSource === "undefined" || fonte || assinantes.size === 0) return;
   const atual = new EventSource(`/api/realtime?cid=${cid}`);
   fonte = atual;
   pronta = false;
