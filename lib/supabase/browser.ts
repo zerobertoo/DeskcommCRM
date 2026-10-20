@@ -7,9 +7,9 @@
  * Sessão persiste via cookie SameSite=Strict gerenciado pelo @supabase/ssr.
  */
 
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
-let _client: ReturnType<typeof createBrowserClient> | null = null;
+let _client: ReturnType<typeof createSupabaseClient> | null = null;
 
 /**
  * QUEM DIZ AO SOCKET DO REALTIME QUAL É O TOKEN.
@@ -138,13 +138,12 @@ export function createClient() {
     );
   }
 
-  _client = createBrowserClient(url, key, {
-    // D-01.01: cookie name canônico alinhado ao middleware/server.
-    cookieOptions: {
-      name: "sb-deskcomm-auth",
-      sameSite: "strict",
-      path: "/",
-    },
+  // O cookie de sessão é httpOnly: o navegador não assina nada sozinho. O token
+  // vem de /api/v1/auth/realtime-token (em memória, renovado antes de vencer) e
+  // serve ao PostgREST e ao socket. Com `accessToken` o `.auth` do SDK não
+  // existe — a sessão é do servidor (Better Auth).
+  _client = createSupabaseClient(url, key, {
+    accessToken: async () => (await tokenDoRealtime()) ?? key,
     realtime: { accessToken: async () => {
       const token = await tokenDoRealtime();
       if (!token) throw new Error("Token de tempo real indisponível.");
