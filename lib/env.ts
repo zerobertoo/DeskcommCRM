@@ -209,6 +209,11 @@ const schema = z.object({
    * menor de `SUPABASE_DB_URL` não alcança; vazia, cai em `SUPABASE_DB_URL`.
    */
   AUTH_DB_URL: z.string().optional().default(""),
+  /**
+   * Cadastro sem confirmação de e-mail (`true`): a conta nasce verificada e a
+   * sessão abre no ato. Substitui o `GOTRUE_MAILER_AUTOCONFIRM`. Padrão `false`.
+   */
+  AUTH_EMAIL_AUTOCONFIRM: z.string().optional().default(""),
 
   // WAHA
   WAHA_API_BASE_URL: required("WAHA_API_BASE_URL"),

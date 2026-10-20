@@ -6,9 +6,13 @@
  * verificação/recuperação) recusa com 501 e nome: falha alta, nunca silêncio.
  */
 
+import { randomUUID } from "node:crypto";
 import { APIError } from "better-auth/api";
+import { env } from "@/lib/env";
+import { emailConfigurado } from "@/lib/email/roteador";
+import { criarAuthAdmin, gravarSenha } from "@/lib/auth/compat/admin";
+import { descartarLinksPendentes, emitirLink, enviarLink } from "@/lib/auth/compat/verificacao";
 import { auth, poolDeAuth } from "@/lib/auth/better-auth";
-import { gravarSenha } from "@/lib/auth/compat/admin";
 import { buscarUsuarioPorId, erroCompat } from "@/lib/auth/compat/usuario";
 import { criarMfaCompat } from "@/lib/auth/compat/mfa";
 import { emitirTokenDoUsuario, type NivelDeAutenticacao } from "@/lib/auth/token-postgrest";
@@ -154,7 +158,58 @@ function montarAuth(
 
     mfa: criarMfaCompat(sessaoAtual),
 
-    signUp: naoConvertido("signUp"),
+    /**
+     * Cria a conta e manda o link de confirmação. Com `AUTH_EMAIL_AUTOCONFIRM=true`
+     * a conta nasce verificada e a sessão abre no ato (`data.session` preenchido
+     * é o sinal que a tela lê). E-mail já cadastrado devolve sucesso ofuscado
+     * (anti-enumeração) — salvo com convite, que já prova que o e-mail é conhecido.
+     */
+    async signUp({ email, password, options }: { email: string; password: string; options?: { emailRedirectTo?: string; data?: Record<string, unknown> } }) {
+      const endereco = email.trim().toLowerCase();
+      const meta = options?.data ?? {};
+      const existente = await poolDeAuth().query<{ id: string; email_verified: boolean }>(
+        "select id, email_verified from auth.users where email = $1",
+        [endereco],
+      );
+      if (existente.rows[0]) {
+        if (meta.invite_token) {
+          return { data: { user: null, session: null }, error: erroCompat("User already registered", 422, "user_already_exists") };
+        }
+        const { id, email_verified } = existente.rows[0];
+        if (!email_verified && options?.emailRedirectTo) {
+          await descartarLinksPendentes("signup", id);
+          await enviarLink({ tipo: "signup", para: endereco, token: await emitirLink("signup", id, endereco), redirectTo: options.emailRedirectTo });
+        }
+        return { data: { user: { ...(await buscarUsuarioPorId(id))!, id: randomUUID() }, session: null }, error: null };
+      }
+
+      const autoconfirma = env.AUTH_EMAIL_AUTOCONFIRM === "true";
+      if (!autoconfirma && !(await emailConfigurado())) {
+        return { data: { user: null, session: null }, error: erroCompat("Error sending confirmation email", 500, "unexpected_failure") };
+      }
+
+      const criada = await criarAuthAdmin().createUser({ email: endereco, password, email_confirm: autoconfirma, user_metadata: meta });
+      if (criada.error || !criada.data.user) return { data: { user: null, session: null }, error: criada.error };
+      const user = criada.data.user;
+
+      if (autoconfirma) {
+        const aberta = await auth().api.abrirSessao({ body: { userId: user.id }, headers: await obterHeaders() });
+        definirSessao({ userId: user.id, sessionId: aberta.sessionId, aal: "aal1" });
+        return { data: { user, session: { access_token: aberta.token, user } }, error: null };
+      }
+
+      const enviado = await enviarLink({
+        tipo: "signup",
+        para: endereco,
+        token: await emitirLink("signup", user.id, endereco),
+        redirectTo: options?.emailRedirectTo ?? `${env.NEXT_PUBLIC_APP_URL}/auth/confirm?type=signup`,
+      });
+      if (!enviado.ok) {
+        await criarAuthAdmin().deleteUser(user.id); // sem e-mail não há como confirmar: não deixa conta órfã
+        return { data: { user: null, session: null }, error: erroCompat("Error sending confirmation email", 500, "unexpected_failure") };
+      }
+      return { data: { user, session: null }, error: null };
+    },
     verifyOtp: naoConvertido("verifyOtp"),
     resend: naoConvertido("resend"),
     resetPasswordForEmail: naoConvertido("resetPasswordForEmail"),

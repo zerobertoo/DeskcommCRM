@@ -14,6 +14,7 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 import { Pool } from "pg";
 import { env } from "@/lib/env";
+import { sessaoDireta } from "@/lib/auth/sessao-direta";
 import { cookieSecure } from "@/lib/supabase/cookie-secure";
 
 let pool: Pool | undefined;
@@ -80,6 +81,7 @@ function criarAuth() {
           session: { fields: { impersonatedBy: "impersonated_by" } },
         },
       }),
+      sessaoDireta(),
       nextCookies(), // por último: grava o cookie em Server Actions
     ],
   });
