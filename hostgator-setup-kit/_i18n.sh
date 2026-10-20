@@ -438,6 +438,14 @@ identifica su red y pon TRAEFIK_NETWORK=<nombre> en el .env antes de volver a in
 
   # ── install.sh: creación del admin, arranque de la stack, healthcheck ───
   ["✓ dono criado e promovido a super-admin"]="✓ dueño creado y promovido a super-admin"
+  ["A URL precisa começar com http:// ou https://."]="La URL debe empezar con http:// o https://."
+  ["Essa chave não é a '{1}'."]="Esa clave no es la '{1}'."
+  ["Não consegui gerar o hash da senha do admin (o Docker baixou a imagem node:22-alpine?)."]="No pude generar el hash de la contraseña del admin (¿Docker descargó la imagen node:22-alpine?)."
+  ["Não consegui promover o admin. Confira a connection string do banco.
+     Este passo escreve em auth.users e em public: ele precisa do dono do
+     banco — declare SUPABASE_DB_ADMIN_URL e rode de novo."]="No pude promover al admin. Revisa la connection string de la base de datos.
+     Este paso escribe en auth.users y en public: necesita ser el dueño de la
+     base — declara SUPABASE_DB_ADMIN_URL y vuelve a ejecutar."
   ["Não consegui promover o admin. Confira a service_role key, a URL e a connection string do Supabase.
      Este passo lê auth.users e escreve em public: num Supabase próprio ele precisa do dono do
      banco — declare SUPABASE_DB_ADMIN_URL e rode de novo."]="No pude promover al admin. Revisa la service_role key, la URL y la connection string de Supabase.
