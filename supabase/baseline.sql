@@ -55750,6 +55750,7 @@ create trigger trg_contato_anonimizado_esquece_a_agenda
 create or replace function public.fn_realtime_notificar()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 declare
   v jsonb := to_jsonb(coalesce(new, old));
