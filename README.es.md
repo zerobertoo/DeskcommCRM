@@ -258,9 +258,9 @@ Toda pantalla tiene puerta en la navegación — el CI reprueba una pantalla que
 | **Frontend** | Next.js 16 App Router (Turbopack) + React 19 + TypeScript 6 estricto | Server Components + Route Handlers en el mismo repo |
 | **Estilo** | Tailwind + shadcn/ui (`new-york`, neutral) | Personalizable sin lock-in |
 | **DB** | Supabase (Postgres + RLS + `vector`) | Multi-tenant nativo, embeddings para RAG |
-| **Auth** | Supabase Auth vía `@supabase/ssr` | Cookie SameSite=Strict, HttpOnly |
-| **Realtime** | Supabase Realtime | postgres_changes + broadcast |
-| **Storage** | Supabase Storage (URLs firmadas) | Bucket privado `whatsapp-media` |
+| **Auth** | Better Auth dentro de la app | Cookie SameSite=Strict, HttpOnly |
+| **Realtime** | SSE de la app sobre LISTEN/NOTIFY | La RLS decide qué llega a cada pestaña |
+| **Storage** | Archivos en disco (URLs firmadas) | Bucket privado `whatsapp-media` |
 | **WhatsApp** | WAHA Plus (motor NOWEB) + Meta Cloud API | QR para empezar rápido; canal oficial para escalar |
 | **Colas** | Tabla `event_log` + workers (cron) | Un trigger de base nunca hace HTTP |
 | **Rate limit** | Upstash Redis (sliding window) | Serverless, el free tier alcanza |

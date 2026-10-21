@@ -281,9 +281,9 @@ Every screen has a door in the navigation — CI fails a screen that exists but 
 | **Frontend** | Next.js 16 App Router (Turbopack) + React 19 + strict TypeScript 6 | Server Components + Route Handlers in one repo |
 | **Styling** | Tailwind + shadcn/ui (`new-york`, neutral) | Customizable without lock-in |
 | **DB** | Supabase (Postgres + RLS + `vector`) | Native multi-tenancy, embeddings for RAG |
-| **Auth** | Supabase Auth via `@supabase/ssr` | SameSite=Strict, HttpOnly cookies |
-| **Realtime** | Supabase Realtime | postgres_changes + broadcast |
-| **Storage** | Supabase Storage (signed URLs) | Private `whatsapp-media` bucket |
+| **Auth** | Better Auth inside the app | SameSite=Strict, HttpOnly cookies |
+| **Realtime** | App SSE over LISTEN/NOTIFY | RLS decides what each tab receives |
+| **Storage** | Files on disk (signed URLs) | Private `whatsapp-media` bucket |
 | **WhatsApp** | WAHA Plus (NOWEB engine) + Meta Cloud API | QR to start fast; official channel to scale |
 | **Queues** | `event_log` table + workers (cron) | A database trigger never makes HTTP calls |
 | **Rate limit** | Upstash Redis (sliding window) | Serverless, free tier is enough |

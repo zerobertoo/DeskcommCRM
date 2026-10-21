@@ -82,6 +82,8 @@ Se faltar Docker, o instalador pergunta e instala sozinho.
 
 ### O que você precisa ter em mãos
 
+> ⚠️ **Em transição (branch `refactor/sair-do-supabase`).** O produto roda sobre Postgres + PostgREST + Better Auth, sem a plataforma Supabase. Instalação nova: `hostgator-setup-kit/install-banco-proprio.sh`. Instalação que já está no Supabase: `scripts/migrar-do-supabase.ts`. Os modos antigos do kit (Supabase externo e single-server) ainda não foram removidos do kit e **não funcionam com este código**; as instruções de instalação abaixo que falam de Supabase estão pendentes de reescrita.
+
 | Item | Onde conseguir |
 |---|---|
 | **VPS com Docker** | [HostGator](https://www.hostgator.com.br/52708-141-3-52.html) (parceria) — ou qualquer VPS com Docker. 4 GB de RAM recomendados |
@@ -305,10 +307,10 @@ Toda tela tem porta na navegação — o CI reprova tela que existe mas em que s
 |---|---|---|
 | **Frontend** | Next.js 16 App Router (Turbopack) + React 19 + TypeScript 6 estrito | Server Components + Route Handlers no mesmo repo |
 | **Estilo** | Tailwind + shadcn/ui (`new-york`, neutral) | Customizável sem lock-in |
-| **DB** | Supabase (Postgres + RLS + `vector`) | Multi-tenant nativo, embedding pra RAG |
-| **Auth** | Supabase Auth via `@supabase/ssr` | Cookie SameSite=Strict, HttpOnly |
-| **Realtime** | Supabase Realtime | postgres_changes + broadcast |
-| **Storage** | Supabase Storage (URLs assinadas) | Bucket privado `whatsapp-media` |
+| **DB** | Postgres + PostgREST (RLS + `vector`) | Multi-tenant nativo, embedding pra RAG |
+| **Auth** | Better Auth dentro do app | Cookie SameSite=Strict, HttpOnly |
+| **Realtime** | SSE do app sobre LISTEN/NOTIFY | A RLS decide o que chega a cada aba |
+| **Storage** | Arquivos em disco (URLs assinadas) | Bucket privado `whatsapp-media` |
 | **WhatsApp** | WAHA Plus (engine NOWEB) + Meta Cloud API | QR pra começar rápido; canal oficial pra escala |
 | **Filas** | `event_log` table + workers (cron) | Trigger de banco nunca faz HTTP |
 | **Rate limit** | Upstash Redis (sliding window) | Serverless, free tier suficiente |
@@ -409,7 +411,7 @@ gh api repos/melgarafael/DeskcommCRM/branches/main/protection \
 | `verify` | typecheck + lint + `lint:channels` + `test:unit` + `test:shell` |
 | `invariants` | sobe um Postgres limpo, aplica o `baseline.sql` em modo **install** e depois em modo **update** — as duas passadas com `ON_ERROR_STOP=1`, que é o que torna a segunda uma prova de idempotência e não só um "terminou" —, e roda os invariantes de RBAC, atribuição, escopo, roteamento, follow-up, webhooks e automações |
 | `build-and-size` | `pnpm build` em Node 22 |
-| `e2e` | sobe Supabase local, aplica o `baseline.sql` e roda pelo frontend todas as specs Playwright menos as que `FORA_DO_CI` declara |
+| `e2e` | sobe o banco local (Postgres + PostgREST do compose), aplica o `baseline.sql` e roda pelo frontend todas as specs Playwright menos as que `FORA_DO_CI` declara |
 | `imagens-ok` | reprova quando qualquer uma das três imagens Docker (`app`, `worker`, `scheduler`) não constrói — é o artefato que o self-hoster instala |
 
 Quais specs ficam de fora é pergunta de comando, não de leitura — esta linha já afirmou que a única era `vps-fresh-onboarding`, e desde o PR #983 ela roda no CI:
@@ -469,7 +471,7 @@ Essas duas linhas são **tudo o que dá para rodar na sua máquina**, de propós
 descobrir o resto como surpresa vermelha depois de horas de espera é a pior primeira experiência
 que este repositório sabe entregar.
 
-Dois gates obrigatórios **não** cabem aí e só rodam no CI: o `e2e` (precisa de Supabase local) e
+Dois gates obrigatórios **não** cabem aí e só rodam no CI: o `e2e` (precisa do banco local no Docker) e
 o `imagens-ok` (constrói as três imagens Docker). Verde na sua máquina não é verde no merge.
 
 **Definition of Done:** typecheck zero, lint zero, testes relevantes verdes, RLS testada se toca tabela tenant-aware, audit log emitido em mutações, migration versionada **+ apêndice no `baseline.sql`** se muda schema (senão a mudança não chega em quem se auto-hospeda). Detalhes em [`CLAUDE.md`](CLAUDE.md#definition-of-done).

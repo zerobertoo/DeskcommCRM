@@ -21,7 +21,7 @@ numa VPS **é** o usuário. Uma mudança que funciona na máquina do dev e quebr
 Stack canônica (major; a versão exata é o `package.json`):
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript 6 estrito · Tailwind 4 (config em CSS) ·
-shadcn/ui (`new-york`) · Supabase (Postgres + Auth + Realtime + Storage) · Zod 4 · Vitest 4 ·
+shadcn/ui (`new-york`) · Postgres + PostgREST + Better Auth (sem a plataforma Supabase) · Zod 4 · Vitest 4 ·
 Playwright 1 · Sentry 11 · WAHA 2026.7.2 (engine NOWEB) · Upstash Redis · Vercel AI Gateway
 (`@ai-sdk/anthropic|openai|google`).
 
@@ -38,11 +38,11 @@ Playwright 1 · Sentry 11 · WAHA 2026.7.2 (engine NOWEB) · Upstash Redis · Ve
   default; `"use client"` só com estado/evento/API de browser. Middleware de borda em `proxy.ts`
   (Next 16 renomeou `middleware.ts` → `proxy.ts`; ele injeta `X-Request-Id` e `x-pathname` e
   autentica a sessão antes da rota).
-- **DB** — Supabase Postgres. RLS em toda tabela tenant-aware via helper
+- **DB** — Postgres 15+ (`pgvector/pgvector:pg15`) com PostgREST, ambos no compose. RLS em toda tabela tenant-aware via helper
   (`fn_user_org_ids()`/`fn_user_role_in_org()`), a mesma função SECURITY DEFINER que o RBAC de
   aplicação usa. Schema versionado em `supabase/migrations/`; o que o self-host aplica é
   `supabase/baseline.sql`.
-- **Auth** — Supabase Auth + `@supabase/ssr`, cookie `SameSite=Strict`. Sempre `getUser()` no
+- **Auth** — Better Auth dentro do app (`lib/auth/better-auth.ts`, adaptador `supabase.auth.*` em `lib/auth/compat/`), cookie `SameSite=Strict`. Sempre `getUser()` no
   server; **nunca** `getSession()`. MFA TOTP é opcional e ligado por quem administra
   (duas políticas que somam: plataforma e organização), regra pura em
   `lib/auth/politica-mfa.ts`.
@@ -50,8 +50,9 @@ Playwright 1 · Sentry 11 · WAHA 2026.7.2 (engine NOWEB) · Upstash Redis · Ve
   **nunca** faz HTTP.
 - **IA** — Vercel AI Gateway (Anthropic primário; embeddings pela OpenAI ou pelo Google, escolha da organização), RAG por tenant,
   guardrails before-send.
-- **Tempo real** — Supabase Realtime (`postgres_changes` para inbox/kanban, `broadcast` para
-  sinais leves). **Storage** — bucket privado `whatsapp-media`, URL assinada.
+- **Tempo real** — SSE do app sobre `LISTEN/NOTIFY` (o trigger avisa só ids; a linha é relida com o
+  token do usuário e a RLS decide). **Storage** — arquivos em disco (`lib/armazenamento/disco.ts`),
+  bucket privado `whatsapp-media`, URL assinada por HMAC.
 
 Fluxo de uma rota autenticada de tenant:
 
@@ -164,8 +165,8 @@ cobre os dois últimos (liste em vez de acreditar nesta linha:
 `invariants` = fachada sobre a matriz `invariants-majors`, que roda `pnpm test:db` (isolamento
 RLS + invariantes de governança) e `pnpm test:db:update` (atualizar banco COM dados) uma vez por
 major de Postgres suportado. `.github/workflows/perf.yml`: `build-and-size` = `pnpm build`.
-`.github/workflows/e2e.yml` roda as specs Playwright contra um Supabase local de verdade com
-o `baseline.sql` aplicado — o mesmo banco que o self-hoster tem. **É check obrigatório** — a
+`.github/workflows/e2e.yml` roda as specs Playwright contra o banco local de verdade (`scripts/local-banco.sh`: Postgres +
+PostgREST + gateway + mailpit do compose) com o `baseline.sql` aplicado — o mesmo banco que o self-hoster tem. **É check obrigatório** — a
 data de ativação não é auditável pelo repositório, e a lista viva está logo abaixo, com o
 comando ao lado. **Não há número aqui de propósito**: esta linha já afirmou uma contagem exata
 de specs e "a única de fora", e as duas envelheceram — a suíte cresce toda semana e a lista de
@@ -379,7 +380,7 @@ git grep -nE "name: *(\"Entrar\"|'Entrar'|/entrar)" -- tests scripts | grep -vE 
 O conserto é no locator, **nunca** no produto: esconder um botão real para agradar regex de teste
 troca um defeito de teste por um defeito de tela.
 
-O `.env.e2e` é obrigatório e é recusado se apontar para Supabase que não seja `127.0.0.1`/
+O `.env.e2e` é obrigatório e é recusado se apontar para banco que não seja `127.0.0.1`/
 `localhost` — a proteção existe porque sem ela a suíte rodaria contra produção (`pnpm e2e:env`
 gera o arquivo).
 

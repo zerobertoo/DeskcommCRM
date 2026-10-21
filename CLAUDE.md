@@ -22,10 +22,10 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
 
 - **Frontend:** Next.js 16 App Router (Turbopack) + React 19 + TypeScript 6 estrito + Tailwind 4 (config em CSS — ver abaixo) + shadcn/ui (style: `new-york`, neutral)
 - **Backend:** Next.js Route Handlers (mesmo repo); workers via `event_log` table + cron
-- **DB:** Supabase (Postgres). RLS em toda tabela tenant-aware. Extensions: `uuid-ossp`, `pgcrypto`, `vector`
-- **Auth:** Supabase Auth via `@supabase/ssr`. Cookie SameSite=Strict, HttpOnly, Secure
-- **Realtime:** Supabase Realtime (postgres_changes + broadcast)
-- **Storage:** Supabase Storage (bucket `whatsapp-media` privado, URLs assinadas)
+- **DB:** Postgres 15+ (imagem `pgvector/pgvector:pg15`) + PostgREST, no compose. RLS em toda tabela tenant-aware. Extensions: `uuid-ossp`, `pgcrypto`, `vector`. O schema `auth` é um shim (`scripts/selfhost-prelude.sql`) que o Better Auth preenche. **Sem a plataforma Supabase** (cerca: `tests/unit/sem-plataforma-supabase.test.ts`); o `@supabase/supabase-js` fica só como cliente do PostgREST
+- **Auth:** Better Auth dentro do app, sobre `auth.users`/`auth.sessions` (`lib/auth/better-auth.ts`; adaptador `supabase.auth.*` em `lib/auth/compat/`). Cookie SameSite=Strict, HttpOnly, Secure. O token do PostgREST (HS256, 10 min) sai de `lib/auth/token-postgrest.ts`. MFA TOTP próprio em `lib/auth/compat/mfa.ts`; passkey não existe
+- **Realtime:** SSE do próprio app sobre `LISTEN/NOTIFY` (trigger `fn_realtime_notificar` só com ids; a linha é relida com o token do usuário e a RLS decide) — `app/api/realtime`, `hooks/realtime/conexao.ts`, uma conexão por aba
+- **Storage:** arquivos em disco (`lib/armazenamento/disco.ts`, volume `app-storage` em `/data/storage`; bucket `whatsapp-media` privado, URL assinada por HMAC servida em `/storage/v1/object/sign`)
 - **WhatsApp:** WAHA Plus, engine NOWEB
 - **Filas/eventos:** `event_log` table + workers (não usar Inngest/Trigger no MVP)
 - **Rate limit:** Upstash Redis sliding window
@@ -160,7 +160,7 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
   O Jev (`lib/ai/decisao/pedidos.ts`) só é perguntado onde esta regra disse não, e nunca bloqueia
   ninguém — no máximo abre um aviso na Central ("Avisar a equipe"): a regra continua a única que bloqueia
   (cerca: `tests/unit/jev-nunca-cala-bloqueia-nem-responde.test.ts`).
-- Mídia: subir pro Supabase Storage primeiro, passar URL ao WAHA (não inline base64)
+- Mídia: gravar no armazenamento em disco primeiro, passar a URL assinada ao WAHA (não inline base64)
 - Multi-device: assinar `message.any` (não só `message`); tratar `fromMe=true` sem duplicar
 - Grupos: entram **só os ligados** em Conexões › Grupos (`channel_session_groups`). O grupo ligado vira conversa `is_group` com um contato `kind = 'whatsapp_group'` que nunca entra em funil, lista, campanha ou IA; o remetente é `p.author` (nunca `p.from`), gravado em `messages.metadata.group_sender` (`lib/messaging/remetente-de-grupo.ts`). Para conversa de grupo o banco emite `message.group_received`, e não `message.received`, e o roteamento automático pula grupo. O filtro `ignore.groups` do WAHA é propriedade desta funcionalidade (`definirRecebimentoDeGrupos`); compatibilidade e convergência não o tocam. Spec: `docs/superpowers/specs/2026-09-23-grupos-na-inbox-design.md`
 - Cron `recover-stuck-messages` (`app/api/v1/cron/recover-stuck-messages/route.ts`, agendado no `scheduler` do `docker-compose.prod.yml`): marca `status='sending'` há >5min como `failed` **e abre aviso na Central** (`agent_inbox_items` kind `message_send_stuck`). Não toca em `queued`: esse estado tem dono (o agent-engine reagenda por `SEND_QUEUED_RETRY_MS`), e falhá-lo perderia mensagem que ia sair. Não reenvia — envio em dobro é pior que não-envio
@@ -230,7 +230,7 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
 | `lib/api/wrappers.ts` | `ok()`, `fail()`, tipos `ApiSuccess<T>` / `ApiError` |
 | `lib/api/errors.ts` | Códigos de erro canônicos |
 | `lib/env.ts` | Validação Zod das env vars (lança no startup se faltar crítica) |
-| `lib/supabase/{browser,server,admin}.ts` | Clients canônicos |
+| `lib/supabase/{browser,server,admin}.ts` | Clients canônicos (PostgREST com o token do usuário; `admin` = service role, auth e storage próprios) |
 | `app/api/v1/health/route.ts` | Health check (Supabase + Redis + WAHA) |
 | `supabase/migrations/` | Schema versionado |
 | `docs/runbooks/deploy.md` | **Deploy em produção — leia ANTES de mexer na VPS** |
@@ -357,7 +357,7 @@ pnpm dev:crons              # chama localmente só os crons de PATHS em scripts/
 ```
 
 Schema: aplique `supabase/baseline.sql`, **não** as migrations (a cadeia não sobe do zero).
-Stack local completa (Supabase via `scripts/local-supabase.sh`; app, worker, scheduler, WAHA e Redis via `docker-compose.local.yml`), depois de rodar
+Stack local completa (banco via `scripts/local-banco.sh`; app, worker, scheduler, WAHA e Redis via `docker-compose.local.yml`), depois de rodar
 `./ubuntu-local-installer.sh` uma vez: `pnpm local:up | local:down | local:status | local:logs`.
 Ver `README.md` pra detalhes de setup.
 
@@ -480,7 +480,7 @@ Checks **obrigatórios** na branch protection da `main` (verificado na configura
 - **`verify`** (`ci.yml`) — typecheck + lint + test:unit.
 - **`invariants`** (`ci.yml`) — **job de fachada**: ele não roda suíte nenhuma; reprova quando a matriz `invariants-majors` não fecha em `success`. Quem roda é a matriz, uma perna por major do Postgres que o produto diz suportar, e cada perna faz duas passadas: `pnpm test:db` (baseline em modo install com `ON_ERROR_STOP=1` e update, mais os invariantes, incluindo o isolamento RLS entre 2 organizações) e `pnpm test:db:update` (atualização de um banco COM dados). Para saber quais majors hoje, pergunte ao arquivo em vez de a esta linha: `awk '/^  invariants-majors:/,/^  [a-z-]+:/' .github/workflows/ci.yml | grep -A6 'matrix:'`.
 - **`build-and-size`** (`perf.yml`) — `pnpm build` em Node 22.
-- **`e2e`** (`e2e.yml`) — sobe Supabase local, aplica o `baseline.sql` e roda **todas as specs Playwright menos as que `FORA_DO_CI` declara** — **em PR que alcança algo que ele mede**. PR só de documentação, teste de outra suíte, fragmento ou workflow alheio pula as partes (regra em `scripts/pr-alcanca-o-e2e.sh`, na dúvida roda), e ali o `e2e` verde **não prova tela nenhuma**. O número saiu daqui de propósito: ele apodreceu **cinco** vezes (a quinta em 2026-08-24, quando `inbox-quem-manda.spec.ts` entrou), e a condição que o PR #242 pôs para parar de recontar já tinha vencido na quarta. Quem precisa do número roda o comando abaixo — comando não envelhece. Quais ficam de fora, e por quê, é o que a própria variável diz — **não confie nesta linha, leia-a**:
+- **`e2e`** (`e2e.yml`) — sobe o banco local (`scripts/local-banco.sh`: db + postgrest + gateway + mailpit do compose), aplica o `baseline.sql` e roda **todas as specs Playwright menos as que `FORA_DO_CI` declara** — **em PR que alcança algo que ele mede**. PR só de documentação, teste de outra suíte, fragmento ou workflow alheio pula as partes (regra em `scripts/pr-alcanca-o-e2e.sh`, na dúvida roda), e ali o `e2e` verde **não prova tela nenhuma**. O número saiu daqui de propósito: ele apodreceu **cinco** vezes (a quinta em 2026-08-24, quando `inbox-quem-manda.spec.ts` entrou), e a condição que o PR #242 pôs para parar de recontar já tinha vencido na quarta. Quem precisa do número roda o comando abaixo — comando não envelhece. Quais ficam de fora, e por quê, é o que a própria variável diz — **não confie nesta linha, leia-a**:
 
   ```bash
   git show origin/main:.github/workflows/e2e.yml | \
@@ -569,7 +569,7 @@ Ao mexer em schema, RLS, RBAC, atribuição, escopo, roteamento, follow-up, webh
 
 **Medidas de front-end por ferramenta, nunca a olho** (`getBoundingClientRect`/`getComputedStyle` no Playwright). Ver `feedback_protocolo_execucao_visivel` na memória.
 
-**Receita de ambiente fresco (não-óbvia):** banco = `baseline.sql` num Supabase local **pg15** (`config.toml major_version = 15`). Já foi pg17, por causa de 9 `GRANT MAINTAIN` que o `pg_dump` emitiu sozinho; hoje quem guarda o piso é `tests/unit/baseline-no-piso-do-postgres.test.ts`; `next build` + `next start` (produção — `next dev` compila lento demais e o Turbopack quebra `cookies()`); **worktree com `node_modules` real, nunca symlink** (Turbopack rejeita symlink "out of filesystem root") e **fora de `/tmp`** (é limpo no meio da sessão — commite cada marco). Detalhes em [[project_invite_e2e_and_bugs]].
+**Receita de ambiente fresco (não-óbvia):** banco = `baseline.sql` no `db` do compose, **pg15** (`pgvector/pgvector:pg15`; o piso é guardado por `tests/unit/baseline-no-piso-do-postgres.test.ts`). Já foi pg17, por causa de 9 `GRANT MAINTAIN` que o `pg_dump` emitiu sozinho; hoje quem guarda o piso é `tests/unit/baseline-no-piso-do-postgres.test.ts`; `next build` + `next start` (produção — `next dev` compila lento demais e o Turbopack quebra `cookies()`); **worktree com `node_modules` real, nunca symlink** (Turbopack rejeita symlink "out of filesystem root") e **fora de `/tmp`** (é limpo no meio da sessão — commite cada marco). Detalhes em [[project_invite_e2e_and_bugs]].
 
 ---
 
@@ -639,7 +639,7 @@ Processo padrão (siga sempre):
 4. **Data migrations genéricas**: se a migration corrige/deduplica dados, escreva pensando em QUALQUER banco de clone (não hardcode IDs do seu tenant). Repointe FKs conferindo o catálogo (`information_schema` FK map) para não perder histórico.
 5. **Descreva no próprio arquivo — NÃO no MANIFEST**: o `.sql` leva uma linha `-- manifest: <o QUÊ e o PORQUÊ, numa linha>` no cabeçalho. Versão e nome saem do nome do arquivo. O `supabase/migrations/MANIFEST.md` é **histórico** e não recebe linha nova: todo PR com migration acrescentava uma linha no FIM dele, o `merge=union` do `.gitattributes` só vale no git local, e o GitHub ignora driver de merge — cada migration que entrava deixava todos os outros PRs com migration CONFLICTING (medido em 02/10/2026: #2009, #2049, #2078, #2080, #2091, #2137, várias vezes cada). Um arquivo por migration não tem com quem conflitar. O registro inteiro é o MANIFEST.md **mais** `grep -m1 '^-- manifest:' supabase/migrations/*.sql`. Quem cobra: `tests/unit/manifest-x-migrations.test.ts` (sem descrição, número ou carimbo repetido, ou descrita nos dois lugares, reprova) e o pre-commit `check-migration-triple.sh`.
 6. **Reflita no `supabase/baseline.sql` (OBRIGATÓRIO — é o que o kit self-host aplica).** O baseline é um dump `--schema-only` + um **apêndice idempotente** no fim do arquivo (blocos rotulados `-- ---- <coisa> (migration NNNN) ----`). O kit HostGator aplica **só o baseline.sql**, tanto no `install.sh` (banco novo, `ON_ERROR_STOP=1`) quanto no `update.sh` (re-aplica em banco existente, **sem** `ON_ERROR_STOP`). Então toda mudança de schema pós-snapshot DEVE ser acrescentada ao apêndice, **idempotente e auto-curativa**: `add column if not exists`, `create ... if not exists`, `create or replace function`, e — se a mudança adiciona constraint — **deduplicar/corrigir os dados ANTES** de criar a constraint (senão o `update.sh` de um clone bugado quebra). Sem isto, clones não recebem a mudança (ou quebram ao atualizar). Migração adicionada só em `migrations/` mas não no baseline **não chega aos self-hosters**.
-7. **Aplique e prove**: aplique via `mcp__plugin_supabase_supabase__apply_migration` (ou `supabase db push`), capture o estado ANTES/DEPOIS e prove invariantes (ex.: contagem de linhas que não pode mudar). Se mexeu em contrato, regenere `lib/database.types.ts`. Para mudanças de schema no kit, valide o baseline num Postgres descartável (`pgvector/pgvector:pg15` + extensões) aplicando `install` (fresh, `ON_ERROR_STOP=1`) e `update` (re-aplicar, sem a flag) — ambos têm que passar.
+7. **Aplique e prove**: aplique com `psql` no banco local (`bash scripts/local-banco.sh apply-baseline` re-aplica o baseline), capture o estado ANTES/DEPOIS e prove invariantes (ex.: contagem de linhas que não pode mudar). Se mexeu em contrato, regenere `lib/database.types.ts`. Para mudanças de schema no kit, valide o baseline num Postgres descartável (`pgvector/pgvector:pg15` + extensões) aplicando `install` (fresh, `ON_ERROR_STOP=1`) e `update` (re-aplicar, sem a flag) — ambos têm que passar.
 8. **Backfill de dados quebrados existentes**: constraint nova falha se os dados atuais a violam — a migration (e o apêndice do baseline) deve deduplicar/corrigir ANTES de criar a constraint.
 9. **Função nova em `public` nasce EXPOSTA — revogue as DUAS origens.** Toda `create function` no schema `public` termina com:
 
