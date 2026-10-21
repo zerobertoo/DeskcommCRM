@@ -21,10 +21,6 @@ import { emitirTokenDoUsuario, type NivelDeAutenticacao } from "@/lib/auth/token
 export type ObterHeaders = () => Promise<Headers> | Headers;
 
 const SEM_SESSAO = () => erroCompat("Auth session missing!", 400, "session_missing");
-const naoConvertido = (nome: string) => async () => ({
-  data: null,
-  error: erroCompat(`supabase.auth.${nome} ainda não foi convertido para o Better Auth`, 501, "not_implemented"),
-});
 
 export interface SessaoResolvida {
   userId: string;
