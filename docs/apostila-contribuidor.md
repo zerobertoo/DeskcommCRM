@@ -238,8 +238,8 @@ endereços e chaves. Os que você vai usar:
 | **Studio** (painel para ver as tabelas) | <http://127.0.0.1:54323> |
 | **Mailpit** (caixa de e-mail falsa: convites, recuperação de senha) | <http://127.0.0.1:54324> |
 
-> Não troque a versão do Postgres em `supabase/config.toml`: o baseline usa recursos que exigem a
-> versão que está lá.
+> Não troque a imagem do Postgres (`pgvector/pgvector:pg15`) no compose: o baseline usa recursos que
+> exigem essa versão.
 
 **Se o passo 1 falhar no meio**, a pasta de migrations pode ter ficado em `/tmp/migrations-off`.
 Antes de qualquer coisa, devolva-a com o passo 5 e confira com `git status` que nada sumiu.

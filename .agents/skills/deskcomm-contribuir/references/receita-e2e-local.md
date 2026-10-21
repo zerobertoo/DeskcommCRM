@@ -41,8 +41,8 @@ docker restart $(docker ps -q --filter name=supabase_realtime)     # a publicati
 mv /tmp/migrations-off/* supabase/migrations/ && rmdir /tmp/migrations-off  # devolva: 4 testes de unit reprovam com a pasta vazia
 ```
 
-`supabase/config.toml` fixa a major do Postgres; o `baseline.sql` usa privilégios que exigem
-pg15+ — não troque a versão.
+A imagem `pgvector/pgvector:pg15` do compose fixa a major do Postgres; o `baseline.sql` usa
+privilégios que exigem pg15+ — não troque a versão.
 
 ## 3. O ambiente da suíte — nunca o `.env.local`
 
