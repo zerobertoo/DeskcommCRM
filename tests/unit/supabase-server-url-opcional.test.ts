@@ -3,8 +3,6 @@ import { readFileSync } from "node:fs";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as Ssr from "@supabase/ssr";
-
 import type * as McpClient from "@/lib/agent-engine/edge/crm/mcp-client";
 
 import {
@@ -75,7 +73,6 @@ beforeEach(() => {
 const MOCKADOS = [
   "next/headers",
   "@/lib/env",
-  "@supabase/ssr",
   "@/lib/agent-engine/env",
   "@/lib/agent-engine/edge/crm/mcp-client",
 ];
@@ -147,7 +144,7 @@ describe("urlDoSupabaseNoServidor — PRESENTE aponta o servidor para a URL nova
     expect(alvos[0]).toBe(`${PRIVADA}/storage/v1/object/sign/b/p.png`);
   });
 
-  it("presente: o client admin pede à URL de servidor e fica na pública", async () => {
+  it("presente: o client admin fica na URL pública e o storage não sai pela rede", async () => {
     vi.doMock("@/lib/env", () => mockDoEnv({ SUPABASE_SERVER_URL: PRIVADA }));
 
     const alvos: string[] = [];
@@ -160,51 +157,9 @@ describe("urlDoSupabaseNoServidor — PRESENTE aponta o servidor para a URL nova
     const client = createAdminClient();
 
     expect((client as unknown as { supabaseUrl: string }).supabaseUrl).toBe(PUBLICA);
+    // o armazenamento é em disco: assinar a URL não faz requisição nenhuma
     await client.storage.from("b").createSignedUrl("p.png", 60);
-    expect(alvos[0]).toBe(`${PRIVADA}/storage/v1/object/sign/b/p.png`);
-  });
-
-  // Sai com o GoTrue: o proxy valida a sessão no banco (Better Auth), não numa URL de servidor.
-  it.skip("presente: o proxy valida a sessão contra a URL de servidor", async () => {
-    // O `proxy` (Edge) é quem valida o JWT de TODA requisição: se o `getUser`
-    // dele não alcançar o Kong, toda navegação de uma instalação com Kong
-    // privado cai para o login. A BASE continua pública (#1786) — o que leva a
-    // requisição ao endereço de servidor é o `global.fetch` que ele passa.
-    const vistas: string[] = [];
-    const desvios: ((entrada: string) => Promise<Response>)[] = [];
-    vi.doMock("@/lib/env", () => mockDoEnv({ SUPABASE_SERVER_URL: PRIVADA }));
-    vi.doMock("@supabase/ssr", async () => {
-      const real = await vi.importActual<typeof Ssr>("@supabase/ssr");
-      return {
-        ...real,
-        createServerClient: (url: string, _key: string, _opts: unknown) => {
-          vistas.push(url);
-          const opcoes = _opts as { global?: { fetch?: (entrada: string) => Promise<Response> } };
-          if (opcoes.global?.fetch) desvios.push(opcoes.global.fetch);
-          return {
-            auth: {
-              getUser: async () => ({ data: { user: { id: "u1" } } }),
-            },
-            rpc: async () => ({ data: true }),
-          };
-        },
-      };
-    });
-
-    const { proxy } = await import("@/proxy");
-    const { NextRequest } = await import("next/server");
-    await proxy(new NextRequest("https://crm.exemplo.com.br/app"));
-
-    expect(vistas).toEqual([PUBLICA]);
-
-    const alvos: string[] = [];
-    vi.stubGlobal("fetch", (entrada: string | URL | Request) => {
-      alvos.push(String(entrada));
-      return Promise.resolve(new Response("{}", { status: 200 }));
-    });
-    const desviar = desvios[0] as (entrada: string) => Promise<Response>;
-    await desviar(`${PUBLICA}/auth/v1/user`);
-    expect(alvos).toEqual([`${PRIVADA}/auth/v1/user`]);
+    expect(alvos).toEqual([]);
   });
 
   it("presente: o health check pergunta ao endereço do servidor", async () => {

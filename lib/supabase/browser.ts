@@ -4,7 +4,7 @@
  * Use este em qualquer arquivo com "use client". NUNCA em Server Components,
  * Route Handlers, ou middleware — eles devem usar `lib/supabase/server.ts`.
  *
- * Sessão persiste via cookie SameSite=Strict gerenciado pelo @supabase/ssr.
+ * A sessão é do Better Auth (cookie SameSite=Strict, httpOnly).
  */
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -12,46 +12,10 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 let _client: ReturnType<typeof createSupabaseClient> | null = null;
 
 /**
- * QUEM DIZ AO SOCKET DO REALTIME QUAL É O TOKEN.
- *
- * O cookie de sessão é httpOnly (CLAUDE.md), então o supabase-js do browser não
- * enxerga a sessão — `auth.getSession()` devolve null. A callback PADRÃO do
- * supabase-js nesse caso é `_getAccessToken()`, e ela termina em
- * `?? this.supabaseKey`: **o socket assina com a anon key**. Canal anônimo
- * responde SUBSCRIBED, a RLS filtra do outro lado, e nada é entregue — morte
- * silenciosa, porque todo sinal disponível diz "saudável".
- *
- * ⚠️ POR QUE AQUI E NÃO EM `setAuth()`, QUE ERA A CORREÇÃO ANTERIOR. O repo
- * corrigia isto chamando `supabase.realtime.setAuth(token)` antes de assinar.
- * Isso PAROU DE FUNCIONAR num bump de dependência, sem uma linha de código
- * nossa mudar: a partir do realtime-js 2.112.x a callback passou a vencer o
- * token manual, o que a própria biblioteca documenta em `setAuth` —
- *
- *   "the callback is the source of truth: the client remains in callback mode
- *    and continues to refresh from it on heartbeat, even after a
- *    bootstrap/override `setAuth(token)` call"
- *
- * — e o `_manuallySetToken` que protegia o token manual virou sempre `false`,
- * porque o SupabaseClient SEMPRE instala uma callback. Medido: o token do
- * usuário sobrevivia ~2ms ao `setAuth`, e o heartbeat seguinte (~30s) o
- * substituía pela anon key de qualquer forma.
- *
- * A callback resolve a RENOVAÇÃO. O primeiro join ainda exige bootstrap:
- * medido no SDK 2.112.4, connect() inicia a busca mas subscribe() pode montar
- * o join antes dela. prepareRealtimeAuthentication aguarda a mesma fonte e
- * setAuth(token), sem remover a callback. Não é a antiga segunda autoridade.
- *
- * Substituir a callback é a via suportada, e ela é melhor que só `setAuth` por
- * uma razão que independe do bug: o socket a chama de novo a cada heartbeat e
- * em cada reconexão. Um token de 1h deixa de ser uma bomba-relógio — quem
- * ficava com o inbox aberto por mais de uma hora perdia o tempo real e nada
- * avisava.
- *
- * `settings.realtime` sobrescreve a callback padrão porque entra depois no
- * spread do SupabaseClient (`_initRealtimeClient({...defaults}, settings.realtime)`),
- * e `accessToken` é opção pública de `RealtimeClientOptions`. Não tocamos em
- * `supabase.auth`: passar `accessToken` no nível do CLIENT (e não do realtime)
- * transformaria `.auth` num Proxy que lança.
+ * O token do PostgREST no navegador. O cookie de sessão é httpOnly, então o
+ * navegador não o lê: o token vem de /api/v1/auth/realtime-token, fica em memória
+ * e é renovado antes de vencer. (O tempo real não usa mais socket do Supabase:
+ * é SSE, ver hooks/realtime/conexao.ts.)
  */
 const MARGEM_DE_RENOVACAO_MS = 60_000;
 
@@ -108,16 +72,6 @@ async function tokenDoRealtime(): Promise<string | null> {
   return buscaEmVoo;
 }
 
-/** O SDK 2.112.4 inicia connect antes de resolver a callback. O primeiro join
- * precisa deste bootstrap; a MESMA callback continua renovando o token depois. */
-export async function prepareRealtimeAuthentication(): Promise<void> {
-  const epoch = authEpoch;
-  const token = await tokenDoRealtime();
-  if (!token || epoch !== authEpoch) throw new Error("Autenticação de tempo real indisponível.");
-  await createClient().realtime.setAuth(token);
-  if (epoch !== authEpoch) throw new Error("O contexto de tempo real mudou.");
-}
-
 export function createClient() {
   // Singleton no browser pra reaproveitar canais Realtime e auth state.
   if (_client) return _client;
@@ -140,15 +94,10 @@ export function createClient() {
 
   // O cookie de sessão é httpOnly: o navegador não assina nada sozinho. O token
   // vem de /api/v1/auth/realtime-token (em memória, renovado antes de vencer) e
-  // serve ao PostgREST e ao socket. Com `accessToken` o `.auth` do SDK não
+  // serve ao PostgREST. Com `accessToken` o `.auth` do SDK não
   // existe — a sessão é do servidor (Better Auth).
   _client = createSupabaseClient(url, key, {
     accessToken: async () => (await tokenDoRealtime()) ?? key,
-    realtime: { accessToken: async () => {
-      const token = await tokenDoRealtime();
-      if (!token) throw new Error("Token de tempo real indisponível.");
-      return token;
-    } },
   });
   return _client;
 }
