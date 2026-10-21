@@ -13,6 +13,7 @@ import { emailConfigurado } from "@/lib/email/roteador";
 import { criarAuthAdmin, gravarSenha } from "@/lib/auth/compat/admin";
 import { consumirLink, descartarLinksPendentes, emitirLink, enviarLink } from "@/lib/auth/compat/verificacao";
 import { auth, poolDeAuth } from "@/lib/auth/better-auth";
+import { ehHashBcrypt } from "@/lib/auth/senha-legada";
 import { buscarUsuarioPorId, erroCompat } from "@/lib/auth/compat/usuario";
 import { criarMfaCompat } from "@/lib/auth/compat/mfa";
 import { emitirTokenDoUsuario, type NivelDeAutenticacao } from "@/lib/auth/token-postgrest";
@@ -110,6 +111,12 @@ function montarAuth(
       try {
         const r = await auth().api.signInEmail({ body: { email, password }, headers: await obterHeaders() });
         await poolDeAuth().query("update auth.users set last_sign_in_at = now() where id = $1", [r.user.id]);
+        // entrou com bcrypt do GoTrue: regrava no formato nativo
+        const { rows: conta } = await poolDeAuth().query<{ password: string | null }>(
+          "select password from auth.accounts where user_id = $1 and provider_id = 'credential'",
+          [r.user.id],
+        );
+        if (conta[0]?.password && ehHashBcrypt(conta[0].password)) await gravarSenha(r.user.id, password);
         const { rows } = await poolDeAuth().query<{ id: string }>("select id from auth.sessions where token = $1", [r.token]);
         if (rows[0]) definirSessao({ userId: r.user.id, sessionId: rows[0].id, aal: "aal1" });
         const user = await buscarUsuarioPorId(r.user.id);
