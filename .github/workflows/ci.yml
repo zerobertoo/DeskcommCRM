@@ -392,17 +392,9 @@ jobs:
         if: matrix.parte == 1 && github.event_name != 'pull_request'
         run: pnpm release:acervo-cabe
 
-
-      # Scripts do kit self-host num repo git descartável (docker/crontab
-      # dublados). É o único gate que exercita o update.sh — um erro aqui
-      # rebobina a instalação de quem hospeda, e nenhum teste TS o veria.
-      #
-      # Desde 2026-08-08 inclui `hostgator-setup-kit/test-validators.sh`, os 163
-      # casos que cobrem o install.sh. Eles existiam e NÃO rodavam em job nenhum
-      # (issue #191): dois defeitos que tornavam a instalação impossível —
-      # escolher OpenRouter travava o instalador num laço, escolher OpenAI
-      # deixava o .env pela metade — passaram por todos os checks verdes. 15s.
-      - name: Kit self-host (bash)
+      # Scripts de apoio do repositório (hooks de git, test-db, stack local) em um
+      # repo git descartável, com docker/crontab dublados.
+      - name: Scripts de apoio (bash)
         if: matrix.parte == 4
         run: pnpm test:shell
 

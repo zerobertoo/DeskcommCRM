@@ -342,7 +342,7 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           set -euo pipefail
-          source hostgator-setup-kit/_manifestos.sh
+          source scripts/manifestos-oci.sh
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             docker buildx imagetools create \
@@ -548,7 +548,7 @@ jobs:
           VERSAO: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          source hostgator-setup-kit/_manifestos.sh
+          source scripts/manifestos-oci.sh
           # `imagetools create` REAPONTA o índice que já foi publicado — não
           # reconstrói. Reconstruir o mesmo commit dá um digest DIFERENTE (foi o
           # que fez `stable` e `1.3.0` divergirem com o mesmo `revision`), e aí o

@@ -68,7 +68,6 @@ const PLACEHOLDER = "caddy-sites/README.caddy";
  */
 const VARIANTES = [
   { caddy: "Caddyfile", compose: "docker-compose.prod.yml" },
-  { caddy: "Caddyfile.single-server", compose: "docker-compose.single-server.yml" },
 ] as const;
 
 function ler(rel: string): string {
@@ -258,7 +257,7 @@ describe("o ponto de extensão do Caddy (#2724)", () => {
     expect(ler("docker-compose.prod.yml")).toMatch(/^networks:\n(?: {2}.*\n| {4}.*\n)*? {2}caddy-sites:\n/m);
   });
 
-  it.each([PLACEHOLDER, "hostgator-setup-kit/README.md"])("o passo a passo de %s recarrega sem derrubar e usa a rede própria", (arquivo) => {
+  it.each([PLACEHOLDER])("o passo a passo de %s recarrega sem derrubar e usa a rede própria", (arquivo) => {
     const texto = ler(arquivo);
     // `restart` com um arquivo errado deixa o Caddy parado e o CRM fora do ar
     // (medido); `reload` recusa o arquivo errado e mantém o que está no ar.
@@ -276,8 +275,7 @@ describe("o ponto de extensão do Caddy (#2724)", () => {
   it.each(VARIANTES)("a configuração que já existia continua de pé no $caddy", (v) => {
     // A outra metade do critério: acrescentar não pode mudar o resultado do que
     // já estava publicado. O que segue é o contrato de borda do produto, medido
-    // também por tests/shell/single-server-installer.test.sh (as seis prefixos
-    // do Supabase, o Studio fora) e por tests/unit/portas-do-compose.test.ts.
+    // também por tests/unit/portas-do-compose.test.ts.
     const texto = ler(v.caddy);
     expect(texto, "o site principal sumiu").toContain("{$DOMAIN} {");
     expect(texto, "o gzip sumiu").toContain("encode gzip");
