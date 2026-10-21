@@ -5,13 +5,7 @@
 import { rmSync } from "node:fs";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const raiz = vi.hoisted(() => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { mkdtempSync } = require("node:fs") as typeof import("node:fs");
-  const { tmpdir } = require("node:os") as typeof import("node:os");
-  const { join } = require("node:path") as typeof import("node:path");
-  return mkdtempSync(join(tmpdir(), "armazenamento-"));
-});
+const raiz = vi.hoisted(() => `${process.env.TEMP ?? process.env.TMPDIR ?? "/tmp"}/armazenamento-${process.pid}-${Date.now()}`);
 vi.mock("@/lib/env", () => ({
   env: {
     STORAGE_DIR: raiz,

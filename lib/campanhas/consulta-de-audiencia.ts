@@ -20,7 +20,7 @@ import { camposUsadosNoTexto, type CamposPersonalizados } from "./renderizador";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 
 /**
- * O teto de linhas por resposta do PostgREST (`max_rows` em `supabase/config.toml`).
+ * O teto de linhas por resposta do PostgREST (`max_rows` em `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)).
  *
  * É a página dos DOIS caminhos: os negócios de `{{lead.x}}` e a consulta de
  * contatos sem recorte de negócio (que pagina até juntar `filtro.limite`).

@@ -3,7 +3,7 @@
  *
  * Sem banco: a rota é medida no que É DELA — janela, escopo manager+ e,
  * sobretudo, a leitura PAGINADA contra o teto do PostgREST. `max_rows = 1000`
- * (`supabase/config.toml`) corta um `.limit(5000)` em 1000 linhas caladas, o
+ * (`docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)) corta um `.limit(5000)` em 1000 linhas caladas, o
  * total saía errado e o `truncado` nunca ligava. O falso abaixo impõe esse
  * teto em TODA resposta. A régua da CONTA mora em `lib/metrics/perdas.test.ts`.
  */

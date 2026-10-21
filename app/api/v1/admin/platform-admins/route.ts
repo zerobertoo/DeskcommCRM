@@ -74,7 +74,7 @@ export async function GET(_req: NextRequest) {
   // Step 3: resolve emails via the Auth Admin API.
   //
   // NÃO dá para consultar `auth.users` pelo PostgREST: `auth` não está entre os
-  // schemas expostos (`supabase/config.toml` expõe `public`, `storage` e
+  // schemas expostos (`docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`) expõe `public`, `storage` e
   // `graphql_public`), então `.schema("auth")` devolve PGRST106 ("Invalid
   // schema: auth") e esta rota inteira virava 500 — a tela mostrava "Erro ao
   // carregar platform admins" mesmo com o service role correto. A Admin API

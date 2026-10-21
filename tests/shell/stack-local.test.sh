@@ -7,7 +7,7 @@ set -uo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 INSTALADOR="$ROOT_DIR/ubuntu-local-installer.sh"
 STACK="$ROOT_DIR/scripts/local-stack.sh"
-SUPA="$ROOT_DIR/scripts/local-supabase.sh"
+SUPA="$ROOT_DIR/scripts/local-banco.sh"
 ENVGEN="$ROOT_DIR/scripts/local-env.sh"
 COMPOSE="$ROOT_DIR/docker-compose.local.yml"
 FAILS=0
@@ -117,7 +117,7 @@ guarda() {
 (
   cd "$TMP_DIR" || exit 1
   paint() { :; }
-  printf 'NEXT_PUBLIC_SUPABASE_URL=https://nuvem.supabase.co\n' > .env.local
+  printf 'NEXT_PUBLIC_SUPABASE_URL=https://nuvem.exemplo.com\n' > .env.local
   eval "$(guarda)"
 ) >/dev/null 2>&1
 check "ambiente da NUVEM é copiado antes de ser substituído" test -s "$TMP_DIR/.env.local.cloud-backup"

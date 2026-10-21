@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   const cursorPayload = cursor ? decodeCursor(cursor) : null;
 
   // O join com `auth.users` acontece em memória, não no Postgres: `auth` não é
-  // um dos schemas expostos ao PostgREST (`supabase/config.toml` expõe `public`,
+  // um dos schemas expostos ao PostgREST (`docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`) expõe `public`,
   // `storage` e `graphql_public`), então qualquer `.schema("auth")` responde
   // PGRST106 "Invalid schema: auth" mesmo com service role. O vínculo vem do
   // PostgREST; email, nome e último login vêm do GoTrue (Auth Admin API).

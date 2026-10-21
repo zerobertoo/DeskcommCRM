@@ -119,7 +119,7 @@ const produtosInputShape = {
 /**
  * Tamanho da página da varredura do catálogo.
  *
- * 1000 é o `max_rows` declarado em `supabase/config.toml:12` — pedir mais numa
+ * 1000 é o `max_rows` declarado em `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`) — pedir mais numa
  * página não traz mais nada, o servidor corta de qualquer jeito.
  */
 const TAMANHO_DA_PAGINA = 1000;
@@ -218,7 +218,7 @@ export const crmSearchProducts: McpToolDefinition<typeof produtosInputShape> = {
     // 128GB de aparecer para quem pediu 256GB. O corte por org acontece no
     // banco, que é o que importa para o isolamento.
     //
-    // ⚠️ O TETO PEDIDO NÃO ERA O TETO APLICADO. `supabase/config.toml:12`
+    // ⚠️ O TETO PEDIDO NÃO ERA O TETO APLICADO. `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)
     // declara `max_rows = 1000`: o PostgREST corta a resposta nesse número, e o
     // `.limit(2000)` que estava aqui nunca trouxe 2000 — trouxe no máximo 1000.
     // Por isso a truncagem NÃO pode ser deduzida de `linhas.length === limite`:

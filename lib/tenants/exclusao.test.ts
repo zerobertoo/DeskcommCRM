@@ -138,7 +138,7 @@ function adminFalso(c: Cenario) {
       if (fn === "fn_logins_sem_vinculo") return { data: c.semVinculo ?? [], error: null };
       if (fn === "fn_arquivos_da_organizacao") {
         // Como o PostgREST: o conjunto vem ordenado por (bucket, nome), a partir
-        // do cursor, e cortado em `max_rows` (1000, supabase/config.toml) sem
+        // do cursor, e cortado em `max_rows` (1000, PGRST_DB_MAX_ROWS) sem
         // erro nem aviso — além do `p_limite` que a função aplica.
         const a = args as { p_apos_bucket?: string | null; p_apos_nome?: string | null; p_limite?: number };
         const ordenados = [...(c.arquivos ?? [])].sort((x, y) =>

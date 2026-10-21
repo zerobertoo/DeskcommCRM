@@ -145,7 +145,7 @@ interface Entrada {
 const LOTE_DO_STORAGE = 100;
 /**
  * Página do inventário do Storage. Abaixo do `max_rows` do PostgREST (1000,
- * `supabase/config.toml`), que corta a resposta de função em silêncio: uma
+ * `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)), que corta a resposta de função em silêncio: uma
  * chamada só devolvia os 1000 primeiros e o resultado dizia "terminou".
  */
 const PAGINA_DO_INVENTARIO = 500;

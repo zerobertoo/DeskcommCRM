@@ -25,7 +25,7 @@
  *
  * ─── O teto é METADE do que o código pede ───────────────────────────────────
  *
- * `supabase/config.toml:12` declara `max_rows = 1000`. O PostgREST corta a
+ * `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`) declara `max_rows = 1000`. O PostgREST corta a
  * resposta nesse número, então o `.limit(2000)` nunca trouxe 2000 — trouxe no
  * máximo 1000. O defeito é o dobro do reportado, e nenhum limite escrito no
  * código dizia isso.

@@ -61,21 +61,22 @@ choose_port() {
 }
 
 generate() {
-  local status vm_ip app_port api_url app_url db_url anon_key service_role_key
-  status="$(./scripts/local-supabase.sh status)"
+  local status vm_ip app_port api_url app_url db_url anon_key service_role_key jwt_secret db_password
+  status="$(./scripts/local-banco.sh status)"
   anon_key="$(printf '%s' "$status" | json_value ANON_KEY)"
   service_role_key="$(printf '%s' "$status" | json_value SERVICE_ROLE_KEY)"
   db_url="$(printf '%s' "$status" | json_value DB_URL)"
-  [[ -n "$anon_key" && -n "$service_role_key" && -n "$db_url" ]] || {
-    printf 'Erro: o Supabase local não retornou as credenciais necessárias.\n' >&2
+  api_url="$(printf '%s' "$status" | json_value API_URL)"
+  jwt_secret="$(printf '%s' "$status" | json_value JWT_SECRET)"
+  db_password="$(printf '%s' "$status" | json_value POSTGRES_PASSWORD)"
+  [[ -n "$anon_key" && -n "$service_role_key" && -n "$db_url" && -n "$jwt_secret" ]] || {
+    printf 'Erro: o banco local não retornou as credenciais necessárias.\n' >&2
     exit 1
   }
 
   vm_ip="$(local_ip)"
   [[ -n "$vm_ip" ]] || vm_ip="127.0.0.1"
-  db_url="${db_url/127.0.0.1/$vm_ip}"
   app_port="$(choose_port)"
-  api_url="http://${vm_ip}:54321"
   app_url="http://${vm_ip}:${app_port}"
 
   if [[ -f "$ENV_FILE" ]] && [[ "$(env_value DESKCOMM_ENV_MODE)" != "local" ]]; then
@@ -102,11 +103,19 @@ generate() {
   cat > "$tmp" <<EOF
 DESKCOMM_ENV_MODE=local
 NODE_ENV=production
-NEXT_PUBLIC_SUPABASE_URL=$api_url
+# A origem pública é a do app: o next.config reescreve /rest/v1 para o PostgREST e o app
+# serve /storage/v1. Os scripts do host falam com o gateway e o banco em 127.0.0.1; os
+# contêineres do app usam db/gateway pela rede do compose (docker-compose.local.yml).
+NEXT_PUBLIC_SUPABASE_URL=$app_url
+SUPABASE_SERVER_URL=$api_url
+POSTGREST_INTERNAL_URL=$api_url/rest/v1
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon_key
 SUPABASE_SERVICE_ROLE_KEY=$service_role_key
+POSTGRES_PASSWORD=$db_password
+PGRST_JWT_SECRET=$jwt_secret
 SUPABASE_DB_URL=$db_url
 SUPABASE_DB_ADMIN_URL=$db_url
+AUTH_DB_URL=$db_url
 
 NEXT_PUBLIC_APP_URL=$app_url
 NEXT_PUBLIC_ADMIN_URL=$app_url

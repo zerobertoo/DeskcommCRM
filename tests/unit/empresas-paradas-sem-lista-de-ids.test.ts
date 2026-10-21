@@ -4,7 +4,7 @@
  * `idsDeOrgsParadas()` buscava todas as orgs não operantes e cada chamador
  * negava `not(organization_id, in, (...))` no PostgREST (ou `<> all` no SQL do
  * worker). Num revendedor com muitas empresas paradas a URL crescia sem teto e,
- * acima de `max_rows = 1000` (`supabase/config.toml`), a lista voltava cortada
+ * acima de `max_rows = 1000` (`docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)), a lista voltava cortada
  * SEM aviso — as empresas além do corte voltavam a disparar/avançar/ingerir.
  *
  * Este arquivo mede por AST/texto que NENHUM dos cinco chamadores monta essa

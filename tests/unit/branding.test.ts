@@ -296,12 +296,6 @@ const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
     motivo: "a mesma chave de localStorage do script do layout; as duas são um par só",
     marcas: ["deskcomm-theme"],
   },
-  "lib/supabase/browser.ts": {
-    categoria: "INFRA",
-    motivo:
-      "nome do cookie de sessão. Renomear invalida a sessão de todo usuário logado no momento da atualização — o `update.sh` do clone viraria um logout em massa",
-    marcas: ["sb-deskcomm-auth"],
-  },
   "lib/impersonate/cookie.ts": {
     categoria: "INFRA",
     motivo:
@@ -701,17 +695,9 @@ describe("catraca de marca no que o GoTrue renderiza", () => {
   const ALVOS: { arquivo: string; limpar: (f: string) => string }[] = [
     { arquivo: "supabase/templates/confirmation.html", limpar: semComentariosHtml },
     { arquivo: "supabase/templates/recovery.html", limpar: semComentariosHtml },
-    { arquivo: "supabase/config.toml", limpar: semComentariosToml },
   ];
 
-  const CONGELADO_SUPABASE: Record<string, EntradaDeMarca> = {
-    "supabase/config.toml": {
-      categoria: "DEV",
-      motivo:
-        "config do Supabase LOCAL (o `supabase start` de dev e do CI). NÃO embarca na imagem e NÃO alcança clone nenhum: um self-hoster usa um projeto na nuvem do Supabase, cuja config de auth vem do marca-emails.sh, ou um GoTrue próprio, que lê env. `project_id` ainda nomeia os contêineres locais (supabase_auth_deskcomm-crm) e os assuntos são o que a suíte local envia",
-      marcas: ["deskcomm-crm", "deskcommcrm", "deskcommcrm"],
-    },
-  };
+  const CONGELADO_SUPABASE: Record<string, EntradaDeMarca> = {};
 
   const encontradoAqui = new Map<string, string[]>();
   for (const { arquivo, limpar } of ALVOS) {

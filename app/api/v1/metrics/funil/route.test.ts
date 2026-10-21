@@ -31,7 +31,7 @@ const JANELA = "?from=2026-09-01T00:00:00.000Z&to=2026-10-01T00:00:00.000Z";
 const URL = `http://localhost/api/v1/metrics/funil${JANELA}`;
 
 /**
- * `supabase/config.toml` → `max_rows = 1000` (e é o padrão do Supabase
+ * `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`) → `max_rows = 1000` (e é o padrão do Supabase
  * Cloud): o PostgREST corta a RESPOSTA nesse tanto, sem erro, mesmo com
  * `.limit()` maior. É este número que o falso aplica em TODA leitura.
  */

@@ -19,7 +19,7 @@ import { neutralizarFormula } from "@/lib/csv/neutralizar-formula";
 export const dynamic = "force-dynamic";
 
 /**
- * Página = `max_rows` (1000, `supabase/config.toml`): pedir mais devolve 1000
+ * Página = `max_rows` (1000, `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)): pedir mais devolve 1000
  * caladas. O fim é provado pelo `count` exato ou por página VAZIA — página
  * curta não é fim numa instalação com `max_rows` menor que a página
  * (`lib/agenda/protecao-followup.ts`).

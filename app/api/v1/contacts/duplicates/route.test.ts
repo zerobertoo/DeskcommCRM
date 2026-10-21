@@ -3,7 +3,7 @@
  *
  * ─── O defeito ──────────────────────────────────────────────────────────────
  *
- * `supabase/config.toml` tem `max_rows = 1000`: o PostgREST corta toda resposta
+ * `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`) tem `max_rows = 1000`: o PostgREST corta toda resposta
  * nesse teto SEM erro. O `.limit(TETO_DE_VARREDURA + 1)` (2001) devolvia 1.000
  * linhas, `1000 <= 2000` dava `varreu_tudo: true`, e o aviso "Mostrando os
  * duplicados entre os contatos mais antigos…" (`components/contacts/MergeDialog.tsx`)

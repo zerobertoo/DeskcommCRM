@@ -44,7 +44,7 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 /**
  * Teto de CADA uma das três leituras: até 5 páginas de 1000, acima disso a
  * resposta diz `truncado: true`. PAGINADO, não `.limit(5000)`: o PostgREST
- * corta toda resposta em `max_rows` (1000, `supabase/config.toml`) sem erro
+ * corta toda resposta em `max_rows` (1000, `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)) sem erro
  * nenhum — um `.limit` maior que isso devolve 1000 linhas caladas, sem
  * `.order()` ainda por cima de um pedaço arbitrário, e o `truncado` nunca
  * ligava. Mesma régua da `win-rates` e da `reports/tags`.

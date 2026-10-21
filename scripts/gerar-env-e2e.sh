@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Gera o `.env.e2e` — o ambiente da suíte Playwright, apontado para o Supabase
-# LOCAL.
+# Gera o `.env.e2e` — o ambiente da suíte Playwright, apontado para o banco
+# LOCAL (scripts/local-banco.sh).
 #
 # ═══ POR QUE ESTE ARQUIVO EXISTE ═══
 #
@@ -28,15 +28,9 @@ CHAVE_CPF=""; CHAVE_WAHA=""; CHAVE_AI=""
 
 cd "$(dirname "$0")/.."
 
-# `supabase` do PATH quando existe (é o que o CI instala, via supabase/setup-cli),
-# `npx supabase` como plano B para a máquina do dev. Insistir no `npx` custaria um
-# download do registry a cada uma das três chamadas abaixo — a CLI não é
-# dependência deste projeto.
-SUPABASE="supabase"
-command -v supabase >/dev/null 2>&1 || SUPABASE="npx supabase"
-
-if ! $SUPABASE status >/dev/null 2>&1; then
-  echo "==> O Supabase local não está de pé. Rode 'npx supabase start' antes." >&2
+BANCO="bash scripts/local-banco.sh"
+if ! $BANCO status >/dev/null 2>&1; then
+  echo "==> O banco local não está de pé. Rode 'bash scripts/local-banco.sh start' antes." >&2
   exit 1
 fi
 
@@ -75,7 +69,7 @@ psql_no_banco() {
   fi
 }
 
-ENVOUT="$($SUPABASE status -o env 2>/dev/null)"
+ENVOUT="$($BANCO env 2>/dev/null)"
 # O `|| true` no fim não é decoração: sob `set -e` + `pipefail`, um `grep` sem
 # casamento (chave que o stack não devolveu) derruba o script AQUI, calado, antes
 # das guardas abaixo. Quem não tem a chave precisa chegar na recusa explicada.
@@ -91,14 +85,16 @@ SERVICE="$(ler SERVICE_ROLE_KEY)"
 # conexão válida, schema idêntico, suíte verde, estrago invisível. É a mesma
 # família do `.env.local` de produção que este arquivo existe para impedir.
 DB_URL="$(ler DB_URL)"
+JWT_SECRET="$(ler JWT_SECRET)"
+POSTGRES_PASSWORD="$(ler POSTGRES_PASSWORD)"
 
 if [ -z "$API_URL" ] || [ -z "$ANON" ] || [ -z "$SERVICE" ]; then
   echo "==> Não consegui ler as chaves do stack local (API_URL/ANON_KEY/SERVICE_ROLE_KEY)." >&2
   exit 1
 fi
 
-# Guarda contra o erro que este arquivo existe para impedir. Se o `supabase
-# status` devolver um host remoto (config apontada para um projeto linkado, por
+# Guarda contra o erro que este arquivo existe para impedir. Se o `local-banco.sh
+# env` devolver um host remoto (config apontada para um projeto linkado, por
 # exemplo), falhar aqui é melhor do que gerar um `.env.e2e` que manda a suíte
 # para a nuvem — o modo de falha silencioso é o caro.
 case "$API_URL" in
@@ -115,7 +111,7 @@ esac
 # é o caro: um `.env.e2e` plausível apontando para o banco errado não dá erro
 # nenhum.
 if [ -z "$DB_URL" ]; then
-  echo "==> Não consegui ler a DB_URL do stack local (o 'supabase status -o env' não trouxe DB_URL)." >&2
+  echo "==> Não consegui ler a DB_URL do stack local (o 'local-banco.sh env' não trouxe DB_URL)." >&2
   echo "    Sem ela, a alternativa seria chutar a porta padrão e semear o banco de outro stack." >&2
   exit 1
 fi
@@ -147,9 +143,22 @@ cat > .env.e2e <<EOF
 # ── Ambiente do E2E — LOCAL, nunca a nuvem ──────────────────────────────────
 # GERADO por 'pnpm e2e:env'. Não versionado (.gitignore cobre '.env*').
 # Antes de rodar a suíte: pnpm e2e:build && pnpm test:e2e
-NEXT_PUBLIC_SUPABASE_URL=$API_URL
+# A origem pública do "Supabase" é a do próprio app: o next.config reescreve /rest/v1 para o
+# PostgREST e o app serve /storage/v1. O servidor fala direto com o gateway.
+NEXT_PUBLIC_SUPABASE_URL=http://localhost:$E2E_PORT
+SUPABASE_SERVER_URL=$API_URL
+POSTGREST_INTERNAL_URL=$API_URL/rest/v1
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON
 SUPABASE_SERVICE_ROLE_KEY=$SERVICE
+PGRST_JWT_SECRET=$JWT_SECRET
+AUTH_DB_URL=$DB_URL
+STORAGE_DIR=$(pwd)/.e2e-storage
+# E-mails do cadastro, convite e redefinição saem pelo SMTP do mailpit (docker-compose.local.yml,
+# perfil e2e; COM_EMAIL=1 no local-banco.sh).
+SMTP_HOST=127.0.0.1
+SMTP_PORT=${MAILPIT_SMTP_PORT:-54325}
+SMTP_SECURITY=none
+SMTP_FROM_EMAIL=crm@deskcomm.test
 # Vem do stack que está de pé (ver o comentário do \`ler DB_URL\` acima), não de
 # um literal: é isto que mantém duas sessões locais escrevendo cada uma no seu
 # banco.

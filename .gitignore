@@ -199,3 +199,4 @@ __pycache__/
 caddy-sites/*
 !caddy-sites/README.caddy
 .storage
+.e2e-storage/

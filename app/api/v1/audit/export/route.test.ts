@@ -3,7 +3,7 @@
  *
  * ─── O defeito ──────────────────────────────────────────────────────────────
  *
- * `supabase/config.toml` tem `max_rows = 1000`: o PostgREST corta toda resposta
+ * `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`) tem `max_rows = 1000`: o PostgREST corta toda resposta
  * nesse teto SEM erro. O `.limit(10_000)` devolvia 1.000 linhas, e o CSV saía
  * com um décimo do que o próprio cabeçalho do arquivo promete ("up to 10k
  * rows") — sem aviso nenhum.

@@ -48,7 +48,7 @@ interface BaseCreds {
  *   → {"code":"PGRST106","message":"Invalid schema: auth",
  *      "hint":"Only the following schemas are exposed: public, storage, graphql_public"}
  *
- * O PostgREST NÃO expõe o schema `auth` (`supabase/config.toml:10`), e a versão
+ * O PostgREST NÃO expõe o schema `auth` (`PGRST_DB_SCHEMAS` no `docker-compose.prod.yml`), e a versão
  * anterior descartava o `error`: `data` nulo virava "o convidado não existe".
  * Consequência: o seed sempre caía no `createUser`, que dá certo na PRIMEIRA vez
  * e depois falha para sempre com `A user with this email address has already

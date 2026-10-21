@@ -103,7 +103,7 @@ const DIAS_DA_CONCORDANCIA = 30;
 const MENSAGENS_COMPARADAS_MAX = 500;
 /** Quantas conversas o cartão oferece por tarefa em cascata — as mais recentes. */
 const CONVERSAS_PERCEBIDAS_MAX = 5;
-/** O teto de linhas por resposta do PostgREST (`max_rows` em `supabase/config.toml`). */
+/** O teto de linhas por resposta do PostgREST (`max_rows` em `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)). */
 const PAGINA = 1000;
 // ponytail: 50 páginas = 50 mil execuções do Jev numa semana; acima disso os
 // números saem das primeiras 50 mil da janela. Um agregado em SQL (RPC, com

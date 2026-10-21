@@ -65,7 +65,7 @@
  * ## Sem migração ⇒ a conta é aqui, e a paginação também
  *
  * F1 não cria função no banco, então a agregação roda na aplicação — e é por
- * isso que a leitura paginar: o `max_rows = 1000` (`supabase/config.toml`) corta
+ * isso que a leitura paginar: o `max_rows = 1000` (`docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)) corta
  * a resposta SEM avisar, e um total somado sobre uma página viria com cara de
  * certo (a mesma medição que o `/reports/financeiro` registrou: R$ 141.436 em
  * vez de R$ 641.103,60). Aqui o `count` exato diz o tamanho, as páginas andam

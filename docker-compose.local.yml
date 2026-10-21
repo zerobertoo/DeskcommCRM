@@ -1,9 +1,8 @@
 # Stack local completa para desenvolvimento e VM Ubuntu.
 #
-# O Supabase local é gerenciado pelo `supabase start` e roda em Docker com os
-# serviços oficiais de Postgres, Auth, PostgREST, Storage e Realtime. Este
-# arquivo sobe os serviços da aplicação na mesma máquina, usando as portas
-# publicadas pelo Supabase local.
+# Banco (db), API REST (postgrest) e gateway são os mesmos serviços da produção;
+# o login é o Better Auth dentro do app. `scripts/local-banco.sh` sobe só o banco
+# e aplica o baseline; `scripts/local-stack.sh up` sobe tudo.
 #
 # Uso: bash scripts/local-stack.sh up
 
@@ -23,6 +22,12 @@ services:
     env_file: ${LOCAL_ENV_FILE:-.env.local}
     environment:
       STORAGE_DIR: /data/storage
+      # Dentro da rede do compose o banco e o gateway são `db` e `gateway`; o .env.local
+      # (lido também pelos scripts do host) aponta para 127.0.0.1.
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      AUTH_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      SUPABASE_SERVER_URL: http://gateway:8000
+      POSTGREST_INTERNAL_URL: http://gateway:8000/rest/v1
       WAHA_API_BASE_URL: http://waha:3000
       # O `worker` abaixo drena o event_log; ver docker-compose.prod.yml.
       EVENT_LOG_WORKER_DRAINS: ${EVENT_LOG_WORKER_DRAINS:-true}
@@ -35,6 +40,10 @@ services:
         condition: service_healthy
       srh:
         condition: service_started
+      gateway:
+        condition: service_started
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       interval: 30s
@@ -57,6 +66,12 @@ services:
     env_file: ${LOCAL_ENV_FILE:-.env.local}
     environment:
       STORAGE_DIR: /data/storage
+      # Dentro da rede do compose o banco e o gateway são `db` e `gateway`; o .env.local
+      # (lido também pelos scripts do host) aponta para 127.0.0.1.
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      AUTH_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      SUPABASE_SERVER_URL: http://gateway:8000
+      POSTGREST_INTERNAL_URL: http://gateway:8000/rest/v1
       WAHA_API_BASE_URL: http://waha:3000
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -89,6 +104,12 @@ services:
     env_file: ${LOCAL_ENV_FILE:-.env.local}
     environment:
       TZ: UTC
+      # Dentro da rede do compose o banco e o gateway são `db` e `gateway`; o .env.local
+      # (lido também pelos scripts do host) aponta para 127.0.0.1.
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      AUTH_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      SUPABASE_SERVER_URL: http://gateway:8000
+      POSTGREST_INTERNAL_URL: http://gateway:8000/rest/v1
       # Os crons autenticam com INTERNAL_CRON_SECRET quando definido; o app
       # aplica a mesma prioridade. Sem este fallback, o scheduler enviava
       # INTERNAL_SECRET e recebia 401 em instalações com os dois segredos.
@@ -199,6 +220,16 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+
+  # Caixa de e-mail de teste do e2e (cadastro, convite e redefinição de senha mandam e-mail
+  # de verdade pelo SMTP). Só sobe com --profile e2e.
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    profiles: ["e2e"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_HTTP_PORT:-54324}:8025"
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-54325}:1025"
 
 volumes:
   app-storage:

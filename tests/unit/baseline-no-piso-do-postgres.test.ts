@@ -11,7 +11,7 @@
  * — privilégio que só existe a partir do pg17. Nove tokens. Nenhum autor os
  * escreveu, nenhum código do projeto usa o privilégio, nenhum teste o assertava.
  *
- * O `supabase/config.toml` então CEDEU ao dump: era `major_version = 15` e foi
+ * O `supabase/config.toml` (já removido) CEDEU ao dump: era `major_version = 15` e foi
  * empurrado para 17 (`docs/testing/HANDOFF-vps-qa.md:61-63`) porque contribuidor
  * rodando `supabase start` pegava pg15 e o baseline quebrava.
  *
@@ -173,9 +173,8 @@ describe("o baseline fica no piso de Postgres que dizemos suportar", () => {
     }
   });
 
-  it("o piso declarado no config.toml acompanha", () => {
-    // O config.toml já cedeu ao baseline uma vez (15 → 17). Se ele voltar a
-    // divergir, contribuidor roda `supabase start` e pega um servidor que não
+  it("o banco do compose (local e de produção) fica no piso", () => {
+    // Se o compose divergir do piso, quem desenvolve e o e2e rodam num servidor que não
     // corresponde ao que o CI testa — foi exatamente o achado M1 de
     // docs/testing/user-journey-map.md.
     //
@@ -183,8 +182,12 @@ describe("o baseline fica no piso de Postgres que dizemos suportar", () => {
     // rodá-lo nas duas majors dobraria o custo do que a matriz do `invariants`
     // (`test:db` em pg15 E pg17) já cobre — a major dói no DDL do baseline, que
     // é justamente o que a matriz mede duas vezes.
-    const toml = readFileSync(path.join(RAIZ, "supabase/config.toml"), "utf8");
-    expect(toml).toMatch(/^\s*major_version\s*=\s*15\s*$/m);
+    for (const arquivo of ["docker-compose.local.yml", "docker-compose.prod.yml"]) {
+      const compose = readFileSync(path.join(RAIZ, arquivo), "utf8");
+      expect(compose, `${arquivo} não usa pgvector/pgvector:pg15 no db`).toMatch(
+        /^\s+image:\s*pgvector\/pgvector:pg15\s*$/m,
+      );
+    }
   });
 
   it("o gate de banco roda no piso, não acima dele", () => {

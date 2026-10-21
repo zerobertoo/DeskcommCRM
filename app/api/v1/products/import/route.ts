@@ -35,7 +35,7 @@ export const dynamic = "force-dynamic";
 /** Lote grande o bastante para uma planilha de loja caber em 3 idas ao banco. */
 const LOTE = 200;
 
-/** O teto de linhas por resposta do PostgREST (`max_rows` em `supabase/config.toml`). */
+/** O teto de linhas por resposta do PostgREST (`max_rows` em `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)). */
 const PAGINA = 1000;
 
 /**

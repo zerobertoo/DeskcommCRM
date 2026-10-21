@@ -8,21 +8,20 @@ const raiz = path.resolve(__dirname, "../..");
 
 describe("o preparo habitual do E2E inclui o catálogo local de extensões", () => {
   it.each(["", "56330"])("inclui o catálogo e respeita E2E_PORT=%s", (porta) => {
-    // Executa o gerador real em outro diretório, sem consultar Docker, projetos
-    // Supabase ou arquivos de ambiente da estação de trabalho.
+    // Executa o gerador real em outro diretório, sem consultar Docker, banco
+    // local ou arquivos de ambiente da estação de trabalho.
     const destino = mkdtempSync(path.join(tmpdir(), "deskcomm-env-extensoes-"));
     try {
       mkdirSync(path.join(destino, "scripts"));
-      mkdirSync(path.join(destino, "bin"));
       const script = path.join(destino, "scripts/gerar-env-e2e.sh");
       copyFileSync(path.join(raiz, "scripts/gerar-env-e2e.sh"), script);
       writeFileSync(
-        path.join(destino, "bin/supabase"),
+        path.join(destino, "scripts/local-banco.sh"),
         `#!/usr/bin/env bash
 set -eu
-if [ "$*" = 'status' ]; then exit 0; fi
-if [ "$*" = 'status -o env' ]; then
-  printf '%s\\n' 'API_URL="http://127.0.0.1:54321"' 'ANON_KEY="synthetic-anon"' 'SERVICE_ROLE_KEY="synthetic-service"' 'DB_URL="postgresql://postgres:senha-sintetica@127.0.0.1:54322/postgres"'
+if [ "$1" = 'status' ]; then exit 0; fi
+if [ "$1" = 'env' ]; then
+  printf '%s\n' 'API_URL="http://127.0.0.1:54321"' 'ANON_KEY="synthetic-anon"' 'SERVICE_ROLE_KEY="synthetic-service"' 'DB_URL="postgresql://postgres:senha-sintetica@127.0.0.1:54322/postgres"' 'JWT_SECRET="segredo-sintetico-com-32-bytes-ou-mais"' 'POSTGRES_PASSWORD="senha-sintetica"'
   exit 0
 fi
 exit 2
@@ -39,13 +38,15 @@ exit 2
       );
       execFileSync("bash", [script], {
         cwd: destino,
-        env: { ...process.env, PATH: `${destino}/bin:${process.env.PATH}`, E2E_PORT: porta },
+        env: { ...process.env, E2E_PORT: porta },
         stdio: "pipe",
         timeout: 10_000,
       });
       const ambiente = readFileSync(path.join(destino, ".env.e2e"), "utf8");
       expect(ambiente).toContain(`NEXT_PUBLIC_APP_URL=http://localhost:${porta || "3001"}\n`);
-      expect(ambiente).toContain("NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321\n");
+      expect(ambiente).toContain(`NEXT_PUBLIC_SUPABASE_URL=http://localhost:${porta || "3001"}\n`);
+      expect(ambiente).toContain("SUPABASE_SERVER_URL=http://127.0.0.1:54321\n");
+      expect(ambiente).toContain("PGRST_JWT_SECRET=segredo-sintetico-com-32-bytes-ou-mais\n");
       expect(ambiente).toContain("EXTENSIONS_LOCAL_CATALOG_ORIGIN=http://127.0.0.1:56331\n");
       // A spec do Jev sobe o dublê nesta porta; o servidor sob teste só o
       // alcança se o gerador a escrever.

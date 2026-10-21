@@ -143,7 +143,7 @@ export interface DbOpts {
   /** Erro do banco numa LEITURA, decidido pela tabela e pelos filtros `eq` dela. */
   readError?: (table: string, filtros: Array<[string, unknown]>) => { code: string; message: string } | null;
   /**
-   * O `max_rows` do PostgREST (1000 em `supabase/config.toml`): corta TODA
+   * O `max_rows` do PostgREST (1000 em `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)): corta TODA
    * leitura nesse tamanho, sem erro, por maior que seja o `.limit`/`.range`.
    * Ausente = sem corte, que é o que os testes que não falam de volume querem.
    */

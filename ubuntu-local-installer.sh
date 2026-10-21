@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # DeskcommCRM - Instalador Automático (Local Ubuntu VM)
-# Este script prepara a VM, sobe o Supabase local (PostgreSQL + Auth +
-# PostgREST + Storage + Realtime), inicializa os serviços da aplicação e cria
+# Este script prepara a VM, sobe o banco local (PostgreSQL + PostgREST), inicializa os serviços da
+# aplicação (o login, o armazenamento e o tempo real são do próprio app) e cria
 # o usuário Admin.
 
 set -Eeuo pipefail
@@ -29,7 +29,7 @@ fi
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
 if [[ "${NODE_MAJOR:-0}" != "22" ]]; then
-  step "Instalando Node.js (necessário para CLI do Supabase e scripts locais)..."
+  step "Instalando Node.js (necessário para os scripts locais)..."
   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
   sudo apt-get install -y nodejs
 fi
@@ -49,31 +49,33 @@ fi
 step "Instalando dependências do projeto..."
 pnpm install --frozen-lockfile
 
-step "Inicializando Supabase Local (PostgreSQL e serviços oficiais)..."
-# O helper inicia a infraestrutura sem a cadeia histórica quebrada e aplica o
-# baseline, que é a fonte de verdade para uma instalação nova.
-./scripts/local-supabase.sh start
+step "Inicializando o banco local (PostgreSQL e PostgREST)..."
+# Sobe db, postgrest e gateway do docker-compose.local.yml e aplica o baseline, que é
+# a fonte de verdade para uma instalação nova.
+./scripts/local-banco.sh start
 
-step "Coletando credenciais do Supabase..."
-# Pega as chaves da API geradas dinamicamente
-SUPA_STATUS=$(./scripts/local-supabase.sh status)
-ANON_KEY=$(printf '%s' "$SUPA_STATUS" | node -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s).ANON_KEY || ""))')
-SERVICE_ROLE_KEY=$(printf '%s' "$SUPA_STATUS" | node -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s).SERVICE_ROLE_KEY || ""))')
-DB_URL=$(printf '%s' "$SUPA_STATUS" | node -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s).DB_URL || ""))')
+step "Coletando credenciais do banco..."
+BANCO_STATUS=$(./scripts/local-banco.sh status)
+campo_do_banco() {
+  printf '%s' "$BANCO_STATUS" | node -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => process.stdout.write(JSON.parse(s)[process.argv[1]] || ""))' "$1"
+}
+ANON_KEY=$(campo_do_banco ANON_KEY)
+SERVICE_ROLE_KEY=$(campo_do_banco SERVICE_ROLE_KEY)
+DB_URL=$(campo_do_banco DB_URL)
+API_URL=$(campo_do_banco API_URL)
+JWT_SECRET=$(campo_do_banco JWT_SECRET)
+DB_PASSWORD=$(campo_do_banco POSTGRES_PASSWORD)
 
-[[ -n "$ANON_KEY" && "$ANON_KEY" != "null" ]] || error "Supabase não retornou ANON_KEY"
-[[ -n "$SERVICE_ROLE_KEY" && "$SERVICE_ROLE_KEY" != "null" ]] || error "Supabase não retornou SERVICE_ROLE_KEY"
-[[ -n "$DB_URL" && "$DB_URL" != "null" ]] || error "Supabase não retornou DB_URL"
+[[ -n "$ANON_KEY" ]] || error "o banco não retornou ANON_KEY"
+[[ -n "$SERVICE_ROLE_KEY" ]] || error "o banco não retornou SERVICE_ROLE_KEY"
+[[ -n "$DB_URL" ]] || error "o banco não retornou DB_URL"
+[[ -n "$JWT_SECRET" ]] || error "o banco não retornou JWT_SECRET"
 
 # Obtendo o IP local da máquina (VM)
 VM_IP=$(hostname -I | awk '{print $1}')
 if [ -z "$VM_IP" ]; then
   VM_IP="127.0.0.1"
 fi
-
-# O CLI informa 127.0.0.1 porque é a perspectiva do host. Os contêineres da
-# aplicação precisam alcançar a porta publicada pelo host usando o IP da VM.
-DB_URL="${DB_URL/127.0.0.1/$VM_IP}"
 
 # 3000 é o padrão, mas não deve impedir a instalação quando outra aplicação já
 # a utiliza na VM. O operador pode fixar APP_PORT antes de chamar o script.
@@ -84,8 +86,8 @@ if command -v ss >/dev/null 2>&1; then
   done
 fi
 
-# Reescrevendo as URLs para apontar para o IP local (para comunicação Host -> Container)
-API_URL="http://$VM_IP:54321"
+# O navegador fala só com o app (que serve /rest/v1 e /storage/v1); o banco e o gateway
+# ficam em 127.0.0.1 e os contêineres os alcançam pela rede do compose.
 APP_URL="http://$VM_IP:$APP_PORT"
 
 step "Gerando chaves de segurança..."
@@ -124,11 +126,16 @@ umask 077
 cat <<EOF > .env.local
 DESKCOMM_ENV_MODE=local
 NODE_ENV=production
-NEXT_PUBLIC_SUPABASE_URL=$API_URL
+NEXT_PUBLIC_SUPABASE_URL=$APP_URL
+SUPABASE_SERVER_URL=$API_URL
+POSTGREST_INTERNAL_URL=$API_URL/rest/v1
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
+POSTGRES_PASSWORD=$DB_PASSWORD
+PGRST_JWT_SECRET=$JWT_SECRET
 SUPABASE_DB_URL=$DB_URL
 SUPABASE_DB_ADMIN_URL=$DB_URL
+AUTH_DB_URL=$DB_URL
 
 NEXT_PUBLIC_APP_URL=$APP_URL
 NEXT_PUBLIC_ADMIN_URL=$APP_URL
@@ -161,7 +168,11 @@ step "Subindo os serviços do DeskcommCRM (App, Worker, WAHA, Redis)..."
 ./scripts/local-stack.sh up
 
 step "Criando usuário Administrador..."
-export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+export NEXT_PUBLIC_SUPABASE_URL="$APP_URL"
+export SUPABASE_SERVER_URL="$API_URL"
+export SUPABASE_DB_URL="$DB_URL"
+export AUTH_DB_URL="$DB_URL"
+export PGRST_JWT_SECRET="$JWT_SECRET"
 export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
 export OWNER_EMAIL="${OWNER_EMAIL:-admin@admin.com}"
 # A senha NASCE ALEATÓRIA e é impressa no fim. A fixa que estava aqui vinha

@@ -65,7 +65,7 @@ const DIAS_MAXIMOS = 3650;
  * pior que medida nenhuma.
  *
  * ⚠️ PAGINADO, não `.limit(10000)`: o PostgREST corta toda resposta em
- * `max_rows` (1000, `supabase/config.toml`) sem erro nenhum — um `.limit` maior
+ * `max_rows` (1000, `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`)) sem erro nenhum — um `.limit` maior
  * que isso devolve 1000 linhas caladas e o `truncado` nunca liga.
  */
 const TAMANHO_DA_PAGINA = 1000;

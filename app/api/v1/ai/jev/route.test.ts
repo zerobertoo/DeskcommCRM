@@ -89,7 +89,7 @@ interface Estado {
 let estado: Estado;
 let papel: Role;
 
-/** O teto do PostgREST sem `range` (`supabase/config.toml`, `max_rows`). */
+/** O teto do PostgREST sem `range` (`docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`), `max_rows`). */
 const MAX_ROWS = 1000;
 
 function cliente(tipo: Consulta["cliente"]) {

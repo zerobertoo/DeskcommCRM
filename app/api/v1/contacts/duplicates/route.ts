@@ -42,7 +42,7 @@ const TETO_DE_VARREDURA = 2000;
 /**
  * Tamanho de cada página da varredura.
  *
- * Igual ao `max_rows = 1000` do `supabase/config.toml` — o mesmo teto que o
+ * Igual ao `max_rows = 1000` do `docker-compose.prod.yml` (`PGRST_DB_MAX_ROWS`) — o mesmo teto que o
  * `win-rates` e o relatório de Perdas (#2560) já respeitam. Um `.limit(2001)`
  * NÃO lê 2.001: o PostgREST corta a resposta em `max_rows` sem erro nenhum, e
  * o `varreu_tudo` respondia `true` com a base inteira cortada em 1.000 linhas.
