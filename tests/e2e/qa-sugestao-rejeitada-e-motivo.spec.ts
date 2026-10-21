@@ -23,7 +23,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import pg from "pg";
 import { expect, test, type Page } from "./helpers/test";
 

@@ -62,7 +62,8 @@
  *
  * Chame no `beforeAll`, antes de qualquer login ou medição.
  */
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
+import { type SupabaseClient } from "@supabase/supabase-js";
 
 import { credenciaisSupabaseDeTeste } from "../../../scripts/lib/env-de-teste";
 

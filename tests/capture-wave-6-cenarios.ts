@@ -38,7 +38,7 @@
  */
 
 import { chromium, type Locator, type Page } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import * as fs from "node:fs";

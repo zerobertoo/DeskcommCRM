@@ -2,7 +2,7 @@
  * Revoga TODAS as sessões ativas de um user via admin API. Força re-login.
  * Run: npx tsx scripts/revoke-sessions.ts <email>
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import { carregarEnvLocal } from "../scripts/lib/env-de-teste";
 
 async function main() {

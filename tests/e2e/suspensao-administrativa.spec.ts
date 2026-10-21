@@ -28,7 +28,7 @@
  */
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 
 import { decidirElegibilidadeDaConversaViaSupabase } from "@/lib/ai/elegibilidade/consulta-supabase";
 

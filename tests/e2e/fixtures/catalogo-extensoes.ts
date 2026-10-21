@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
+import { type SupabaseClient } from "@supabase/supabase-js";
 
 import type { ExtensionManifest } from "../../../lib/extensions/manifest";
 import { credenciaisSupabaseDeTeste } from "../../../scripts/lib/env-de-teste";

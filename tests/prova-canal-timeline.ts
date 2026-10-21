@@ -14,7 +14,7 @@
  *
  * Run: npx tsx tests/prova-canal-timeline.ts
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 
 import { CREDS, carimbar } from "./qa-helpers";
 import { carregarEnvLocal } from "../scripts/lib/env-de-teste";

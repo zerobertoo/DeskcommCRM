@@ -15,7 +15,7 @@
  * Run: npx tsx scripts/seed-e2e-invite.ts
  */
 import { execFileSync } from "node:child_process";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { anunciarDestino, credenciaisSupabaseDeTeste } from "./lib/env-de-teste";

@@ -18,7 +18,7 @@ import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
 import { expect, test } from "./helpers/test";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 
 test("a primeira sessão mostra o QR depois de aceitar e ligar a voz", async ({
   page,

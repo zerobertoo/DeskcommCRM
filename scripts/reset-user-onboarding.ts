@@ -2,7 +2,7 @@
  * Move um user para uma org NOVA sem onboarded_at, pra forçar o fluxo de onboarding.
  * Run: npx tsx scripts/reset-user-onboarding.ts <email> [org-slug]
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import { carregarEnvLocal } from "../scripts/lib/env-de-teste";
 
 const env = carregarEnvLocal();

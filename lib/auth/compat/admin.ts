@@ -4,6 +4,7 @@
  */
 
 import { auth, poolDeAuth } from "@/lib/auth/better-auth";
+import { emitirLink, type TipoDeLink } from "@/lib/auth/compat/verificacao";
 import {
   COLUNAS_DE_USUARIO,
   buscarUsuarioPorId,
@@ -104,6 +105,19 @@ export function criarAuthAdmin() {
       );
       if (attrs.password) await gravarSenha(id, attrs.password);
       return { data: { user: (await buscarUsuarioPorId(id)) as UsuarioCompat }, error: null };
+    },
+
+    /**
+     * Gera o token de um link de e-mail sem mandar e-mail (os specs seguem o link direto).
+     * `hashed_token` é o valor que o link leva em `token_hash=`, como no GoTrue.
+     */
+    async generateLink({ type, email }: { type: TipoDeLink; email: string }) {
+      const { rows } = await poolDeAuth().query<{ id: string }>("select id from auth.users where lower(email) = lower($1)", [email]);
+      const id = rows[0]?.id;
+      const user = id ? await buscarUsuarioPorId(id) : null;
+      if (!user) return { data: { properties: null, user: null }, error: erroCompat("User not found", 404, "user_not_found") };
+      const token = await emitirLink(type, user.id, email.trim().toLowerCase());
+      return { data: { properties: { hashed_token: token, action_link: null }, user }, error: null };
     },
 
     async deleteUser(id: string) {

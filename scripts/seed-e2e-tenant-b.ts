@@ -14,7 +14,7 @@
  * Run: npx tsx scripts/seed-e2e-tenant-b.ts
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";

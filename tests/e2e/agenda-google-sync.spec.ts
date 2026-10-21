@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import { test, expect, type Page, type TestInfo } from "./helpers/test";
 import { credenciaisSupabaseDeTeste } from "../../scripts/lib/env-de-teste";
 import { reconcileAppointment } from "../../lib/agenda/google/sync-executor";

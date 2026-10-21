@@ -158,6 +158,9 @@ STORAGE_DIR=$(pwd)/.e2e-storage
 SMTP_HOST=127.0.0.1
 SMTP_PORT=${MAILPIT_SMTP_PORT:-54325}
 SMTP_SECURITY=none
+# Cadastro pede confirmação por e-mail (o que signup-journey e invite-lifecycle medem). Explícito e
+# vazio: um .env.local de desenvolvimento com AUTH_EMAIL_AUTOCONFIRM=true não pode vazar para a suíte.
+AUTH_EMAIL_AUTOCONFIRM=
 SMTP_FROM_EMAIL=crm@deskcomm.test
 # Vem do stack que está de pé (ver o comentário do \`ler DB_URL\` acima), não de
 # um literal: é isto que mantém duas sessões locais escrevendo cada uma no seu

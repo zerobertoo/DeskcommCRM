@@ -39,7 +39,7 @@
 import { randomUUID } from "node:crypto";
 
 import { chromium, type Page } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 
 import { mirrorLeadStageToCrm } from "@/lib/agent-engine/edge/crm/move-lead-stage";
 import { carregarEnvLocal } from "../scripts/lib/env-de-teste";

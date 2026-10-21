@@ -11,7 +11,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
+import { type SupabaseClient } from "@supabase/supabase-js";
 import { test, expect } from "./helpers/test";
 
 import { seguirLinkDeAcesso } from "./helpers/auth";

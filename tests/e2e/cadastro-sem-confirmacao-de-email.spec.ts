@@ -49,7 +49,7 @@
 import { randomUUID } from "node:crypto";
 
 import { test, expect } from "./helpers/test";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 
 const URL_SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const svc = createClient(URL_SUPABASE, process.env.SUPABASE_SERVICE_ROLE_KEY!, {

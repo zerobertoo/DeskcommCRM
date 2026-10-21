@@ -2,7 +2,7 @@
  * Cria/atualiza um usuário Supabase já confirmado e o anexa à E2E Test Org como admin.
  * Run: npx tsx scripts/create-test-user.ts <email> [password]
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import { carregarEnvLocal } from "../scripts/lib/env-de-teste";
 
 const env = carregarEnvLocal();

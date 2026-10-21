@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/scripts/lib/cliente-supabase";
 import { expect, test, type Page, type TestInfo } from "./helpers/test";
 
 import { credenciaisSupabaseDeTeste } from "../../scripts/lib/env-de-teste";
