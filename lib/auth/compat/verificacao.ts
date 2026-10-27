@@ -8,9 +8,6 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { poolDeAuth } from "@/lib/auth/better-auth";
-import { assuntoDoModelo, montarTemplateDeAcesso, type ModeloDeAcesso } from "@/lib/email/templates/acesso-gotrue";
-import { marcaDaSaida } from "@/lib/branding/saida";
-import { sendEmail } from "@/lib/email/roteador";
 
 export type TipoDeLink = "signup" | "invite" | "recovery";
 
@@ -51,19 +48,4 @@ export async function descartarLinksPendentes(tipo: TipoDeLink, userId: string):
     "delete from auth.verifications where identifier like $1 and value::jsonb ->> 'userId' = $2",
     [`${tipo}:%`, userId],
   );
-}
-
-const modeloDe = (tipo: TipoDeLink): ModeloDeAcesso => (tipo === "recovery" ? "recovery" : "confirmation");
-
-/**
- * Manda o e-mail do link pelo roteador (SMTP ou Resend). `redirectTo` já traz
- * `?type=…`, como nos e-mails do GoTrue; o token entra com `&token_hash=`.
- */
-export async function enviarLink(params: { tipo: TipoDeLink; para: string; token: string; redirectTo: string }) {
-  const marca = await marcaDaSaida(null);
-  const modelo = modeloDe(params.tipo);
-  const html = montarTemplateDeAcesso(modelo, marca)
-    .split("{{ .RedirectTo }}").join(params.redirectTo)
-    .split("{{ .TokenHash }}").join(params.token);
-  return sendEmail({ to: params.para, subject: assuntoDoModelo(modelo, marca), html });
 }
