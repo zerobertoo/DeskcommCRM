@@ -7,14 +7,14 @@ resolvendo os problemas você mesmo.
 ## O guia completo mora no repositório — abra-o primeiro
 
 Este arquivo é o roteiro curto. O guia inteiro — cada campo que o instalador pede, o que acontece
-se pular cada opcional, domínio e DNS por registrador, Supabase (token, plano grátis, próprio),
+se pular cada opcional, domínio e DNS por registrador, banco próprio (Postgres do compose),
 proxy da hospedagem, agência instalando para cliente, e o catálogo de problemas com o comando de
 cada um — vive em `.agents/skills/deskcomm-instalar/SKILL.md` na raiz do repositório.
 
 Se você está vendo só esta pasta, clone o repositório (o instalador precisa dele de qualquer forma):
 
 ```bash
-git clone --depth 1 https://github.com/melgarafael/DeskcommCRM.git deskcommcrm
+git clone --depth 1 https://github.com/zerobertoo/DeskcommCRM.git deskcommcrm
 cd deskcommcrm
 cat .agents/skills/deskcomm-instalar/SKILL.md
 ```
@@ -39,11 +39,7 @@ discordarem, vale o guia; quando o guia e `install.sh` discordarem, vale o insta
   Sem servidor: `bash comecar.sh` no computador dela nomeia o plano (2 vCPU / 4 GB) e abre o link.
 - Um **domínio** (ex.: `crm.empresadela.com.br`) apontado para o IP do servidor com um registro A.
   Cloudflare: nuvem cinza até o cadeado aparecer.
-- Uma conta no **Supabase** (o banco). Prefira o **token de acesso pessoal**
-  (supabase.com/dashboard/account/tokens): o instalador cria o projeto sozinho, acha a connection
-  string certa e configura os links dos e-mails de acesso. O token não fica salvo. Sem token: Project
-  URL, anon key, service_role key e a connection string **Session pooler em modo URI** (nunca a
-  "Direct connection", que é só IPv6 e não conecta de uma VPS).
+- Nenhuma conta de banco: o Postgres e o PostgREST sobem no próprio servidor, pelo compose.
 - **Qual IA vai atender** — o instalador pergunta antes das chaves: OpenRouter (uma chave, muitos
   modelos, o mais simples), Anthropic (Claude, padrão do Enter) ou OpenAI. Se não for OpenAI, ele
   pede a chave da OpenAI à parte e **opcional** (áudio e base de conhecimento — dá para cadastrar
@@ -56,11 +52,11 @@ discordarem, vale o guia; quando o guia e `install.sh` discordarem, vale o insta
 1. **Confirme onde está rodando.** O instalador roda **dentro da VPS**, por SSH: `uname -a`,
    `docker --version`, `ss -tlnp | grep sshd` (a porta do SSH pode não ser 22 — nunca ative firewall
    liberando só a 22). Sem Docker, o instalador instala.
-2. **Prepare o banco e o domínio** com a pessoa (acima). O instalador confere o DNS e espera junto.
+2. **Prepare o domínio** com a pessoa (acima). O instalador confere o DNS e espera junto.
 3. **Rode o instalador no modo interativo**, respondendo os prompts com o que ela te deu:
 
    ```bash
-   bash hostgator-setup-kit/install.sh
+   bash hostgator-setup-kit/install-banco-proprio.sh --domain crm.empresadela.com.br
    ```
 
    Ele valida cada resposta na hora, aceita `voltar`, retoma se interromper e mostra uma tela de
@@ -75,7 +71,7 @@ discordarem, vale o guia; quando o guia e `install.sh` discordarem, vale o insta
    onboarding, o WhatsApp é conectado por QR (deixe o app do celular já aberto em Aparelhos
    conectados; o QR vale poucos minutos).
 5. **Deixe pronto para durar:** backup diário no cron (`bash hostgator-setup-kit/backup.sh`; o
-   Supabase grátis não faz sozinho) e explique que atualizar é pela tela (menu → rodapé → "Nova
+   banco fica só neste servidor) e explique que atualizar é pela tela (menu → rodapé → "Nova
    versão"); `bash hostgator-setup-kit/update.sh` é o caminho manual, com backup antes.
 
 ## Quando der problema (você resolve)
@@ -84,8 +80,7 @@ discordarem, vale o guia; quando o guia e `install.sh` discordarem, vale o insta
 |---|---|
 | sem cadeado / site não abre | `getent ahosts <domínio>` vs `curl -s https://api.ipify.org`; portas 80/443; `docker compose -f docker-compose.prod.yml restart caddy` |
 | app reiniciando em loop | `docker compose -f docker-compose.prod.yml logs app \| grep '\[env\] Falha de validação'` — diz a variável que falta |
-| "Network unreachable" no banco | trocar a connection string pela **Session pooler** |
-| "esqueci minha senha" com link para `localhost:3000` | Supabase na nuvem: `export SUPABASE_ACCESS_TOKEN=sbp_... && bash hostgator-setup-kit/marca-emails.sh`. Supabase na VPS (single-server) ou próprio: o token não serve — confira `SITE_URL` e `ADDITIONAL_REDIRECT_URLS` no `.env` do Supabase (no single-server, `.runtime/supabase/.env`) e RECRIE o auth, porque `restart` não relê o `.env`: single-server, `cd .runtime/supabase && docker compose up -d --no-deps auth` (o `dc_supabase` do kit); próprio, `docker compose up -d auth` na pasta do Supabase dele |
+| "esqueci minha senha" com link para `localhost:3000` | confira `NEXT_PUBLIC_APP_URL` e `DOMAIN` no `.env` e recrie o `app` (`docker compose -f docker-compose.prod.yml up -d app`) |
 | esqueci a senha / perdi o autenticador | `bash hostgator-setup-kit/reset-password.sh <email>` / `bash hostgator-setup-kit/reset-mfa.sh <email>` |
 | está tudo no ar? | `bash hostgator-setup-kit/healthcheck.sh` |
 
