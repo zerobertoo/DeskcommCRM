@@ -1,0 +1,288 @@
+# DeskcommCRM — Kit de Instalação (HostGator)
+
+Este kit sobe o **DeskcommCRM** no seu servidor VPS da HostGator. Você tem dois caminhos:
+
+> **Ainda nem tem servidor?** Comece por `comecar.sh` — ele roda **no seu computador**, antes
+> de existir VPS, e responde a pergunta que trava todo mundo no início: *o que eu preciso
+> contratar?* Ele nomeia o plano (VPS Turing, 2 vCPU / 4 GB — o Cartesius não dá conta do
+> WhatsApp), abre a página se você quiser, e devolve o comando exato do seu caso. Depois que
+> a VPS existir, o caminho é o `install.sh` daqui de baixo.
+>
+> ```bash
+> bash comecar.sh
+> ```
+
+> **Outra hospedagem?** O kit é feito para a HostGator (é a parceria do projeto e o caminho
+> testado de ponta a ponta), mas roda em qualquer VPS **x86_64/amd64 ou ARM64/aarch64** com Docker. Se a sua já vem com um
+> **proxy reverso próprio** ocupando as portas 80/443 — caso de Hostinger, Coolify, Dokploy
+> e CapRover —, o instalador **detecta isso sozinho** e publica o CRM através dele, em vez
+> de tentar subir um Caddy que não caberia. Ver
+> [VPS que já vem com proxy próprio](#vps-que-já-vem-com-proxy-próprio-hostinger-coolify-dokploy).
+
+## 🤖 Caminho fácil: deixe o assistente de código fazer
+
+1. Contrate um **VPS na HostGator** e acesse-o por SSH.
+2. Clone o repositório (`git clone --depth 1 https://github.com/melgarafael/DeskcommCRM.git deskcommcrm`)
+   e abra a pasta no **Claude Code, Codex, Cursor, OpenCode ou Antigravity** dentro do VPS —
+   ou jogue só esta pasta no chat: o `CLAUDE.md` daqui manda clonar e abre o guia.
+3. Diga: *"instala o DeskcommCRM pra mim"*. O guia `deskcomm-instalar` conduz tudo —
+   cria o banco, gera as senhas, sobe o CRM e te ajuda a conectar o WhatsApp.
+
+## ⚙️ Caminho manual: um comando
+
+Dentro do VPS:
+
+```bash
+bash install.sh
+```
+
+> **VPS sem Docker?** O instalador resolve. Se não encontrar o Docker, ele **pergunta**
+> antes e instala pelo `get.docker.com` — o instalador oficial da Docker, que roda como
+> root, como manda a documentação deles. Com `--yes` ele segue sem perguntar, que é o
+> contrato desse modo. Se preferir instalar por conta própria, responda `n` e rode
+> `curl -fsSL https://get.docker.com | sh` antes.
+
+O instalador pergunta o que precisa (domínio, chaves do Supabase, provedor de IA
+— a chave pode ficar para depois —, e-mail/senha do admin), gera o resto e sobe tudo.
+
+> Modo não-interativo: copie `.env.hostgator.example` (do repositório) para `.env`,
+> preencha, e rode `bash install.sh --yes`.
+
+## Criar o Supabase automaticamente (opcional)
+
+Criar o projeto no navegador e copiar as 4 credenciais é o passo mais demorado da
+instalação — e o mais fácil de errar (copiar a *Direct connection*, que é IPv6-only e
+não conecta de um VPS IPv4, é a armadilha mais comum). Dá para pular tudo isso:
+
+```bash
+export SUPABASE_ACCESS_TOKEN=sbp_...        # supabase.com/dashboard/account/tokens
+bash install.sh                             # cria o projeto e segue a instalação
+```
+
+O `install.sh` chama o provisionamento sozinho quando encontra o token e as
+credenciais ainda vazias — as 4 variáveis entram no fluxo sem copiar e colar.
+Para criar só o projeto, sem instalar, o script também roda sozinho:
+
+```bash
+bash supabase-provision.sh "Nome do Projeto" sa-east-1 >> .env
+```
+
+O script cria o projeto, **espera o banco ficar `ACTIVE_HEALTHY`** (projeto novo não
+nasce pronto), busca as chaves e **descobre o host do pooler testando conexão real** em
+vez de adivinhar. Imprime as 4 linhas prontas para colar no `.env`.
+
+⚠️ **O token é uma chave mestra** — dá acesso a todos os projetos da conta. Ele é lido do
+ambiente e nunca gravado em disco. Instalando para terceiros, use o token DO CLIENTE, ou
+rode o script na sua máquina e leve só as 4 credenciais para o servidor dele.
+
+⚠️ **Plano grátis: 2 projetos por usuário**, contados em todas as organizações onde ele é
+Owner/Admin. Não dá para hospedar vários clientes numa conta só.
+
+## O que você precisa antes
+
+| Item | Onde conseguir |
+|---|---|
+| VPS (Docker) | HostGator — VPS com Docker (n8n/OpenClaw/GatorClaw). Outras hospedagens com Docker também servem — se a sua já tiver proxy próprio nas portas 80/443, [veja aqui](#vps-que-já-vem-com-proxy-próprio-hostinger-coolify-dokploy) |
+| Domínio | Registro de domínio (aponte um A-record pro IP do VPS) |
+| Banco de dados | Conta grátis no [supabase.com](https://supabase.com) (3 chaves + connection string) |
+| IA | Chave da [Anthropic](https://console.anthropic.com) — opcional: dá para instalar sem ela e cadastrar depois pela tela (IA › Credenciais) |
+| WhatsApp | Seu número — conectado por QR code no onboarding |
+| Token do Supabase (opcional) | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) — com ele o instalador configura sozinho os links dos e-mails de acesso. **Ele não fica salvo:** é usado uma vez e some com o processo |
+
+> **Sem esse token, um passo fica manual — e ele importa.** Os e-mails de
+> "esqueci minha senha", de confirmação de cadastro e de aceite de convite saem
+> com o endereço que estiver em **Authentication → URL Configuration** do seu
+> projeto Supabase. Ele nasce como `http://localhost:3000`, que só existe na
+> máquina de quem desenvolve — então o link chega quebrado para todo mundo, e
+> ninguém consegue redefinir a própria senha.
+>
+> Se você pular o token, o instalador termina avisando exatamente o que
+> preencher, com o seu domínio já escrito. Se preferir fazer agora:
+>
+> - **Site URL:** `https://SEU_DOMINIO`
+> - **Redirect URLs:** `https://SEU_DOMINIO/auth/confirm`
+
+## Requisitos do VPS
+
+- **Arquitetura x86_64/amd64 ou ARM64/aarch64.** As imagens DeskcommCRM são publicadas para
+  `linux/amd64` e `linux/arm64`; o instalador seleciona a variante oficial ARM64 NOWEB do WAHA.
+  O modo com Supabase self-hosted na mesma VPS também funciona em ARM64: a versão upstream
+  fixada pelo kit (`self-hosted/v0.8.1`) e as imagens dos seus 11 serviços têm manifestos
+  `linux/arm64` na ref atualmente validada. O pré-voo descobre e testa a lista inteira
+  novamente a cada instalação; não presume que continuará com 11 serviços. Para Oracle
+  Ampere A1, siga o [runbook ARM64](../docs/runbooks/oracle-arm64.md).
+- **4 GB RAM recomendados.** A imagem é pré-buildada, então o servidor não compila nada e a
+  stack SOBE com 2 GB — mas operar é outra coisa: são 7 contêineres, e o WAHA consome
+  ~150 MB por sessão de WhatsApp além de ~300 MB de overhead do Node. Com 2 GB você roda
+  no limite e vai precisar de swap. Ver `docs/runbooks/waha-hostgator.md`.
+- Portas **80** e **443** abertas, e a **22022** do SSH (`ufw allow 22,22022,80,443/tcp`).
+- Docker + Docker Compose v2 — o `install.sh` instala o Docker sozinho se faltar (ver acima).
+
+### VPS que já vem com proxy próprio (Hostinger, Coolify, Dokploy…)
+
+Algumas hospedagens entregam a VPS com um **Traefik** já ocupando as portas 80/443 — é ele
+que dá HTTPS automático ao que o painel instala. O Caddy do kit quer as mesmas portas e não
+sobe. O instalador **detecta isso sozinho** e grava `REVERSE_PROXY=traefik` no `.env`; a
+partir daí os scripts do kit incluem o override que desliga o Caddy e publica o app pelo
+Traefik da hospedagem. Rodando compose na mão nessas instalações, use os dois arquivos:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.traefik.yml up -d
+```
+
+Não desligue o Traefik da hospedagem para liberar as portas — isso quebra as automações do
+painel dela. Se o seu Traefik usa nomes diferentes de `websecure`/`letsencrypt`, ajuste
+`TRAEFIK_ENTRYPOINT` e `TRAEFIK_CERTRESOLVER` no `.env`.
+
+Há um caso em que o instalador **pergunta em vez de decidir**: quando o Traefik da
+hospedagem roda em `--network host` (a Hostinger faz assim), o Docker não mostra porta
+publicada em contêiner nenhum, e então não dá para provar que é ele quem atende o seu
+domínio — poderia ser um nginx instalado direto no servidor. Como publicar o CRM atrás do
+proxy errado deixa o site no ar sem responder, o instalador mostra o que encontrou e pede
+confirmação. Em `bash install.sh --yes` não há a quem perguntar: ele para e pede que você
+declare `REVERSE_PROXY=traefik` no `.env` — aí a escolha é sua e ele segue sem perguntar.
+
+Atrás do proxy do Coolify (ou outro Traefik em rede Docker própria): veja [docs/saas/coolify.md](../docs/saas/coolify.md) — a porta do banco (API_GW_HTTP_PORT) e a rede do proxy (TRAEFIK_NETWORK) vão no comando.
+
+## Scripts do kit
+
+| Script | Função |
+|---|---|
+| `install.sh` | Instala tudo (idempotente) |
+| `update.sh` | Atualiza pra versão nova |
+| `backup.sh` | Backup do banco + sessões WhatsApp |
+| `restore.sh` | Restaura um backup |
+| `reset-password.sh` | Redefine senha de um usuário |
+| `reset-mfa.sh` | Remove o MFA de um usuário travado |
+| `healthcheck.sh` | Diagnóstico dos serviços |
+| `preflight-upgrade.sh` | Sonda uma release numérica de um kit novo antes de usar o updater antigo |
+
+No ARM64, o instalador e o updater recusam antecipadamente uma release cujas quatro
+imagens do CRM ou a WAHA efetiva não tenham variante nativa. No single-server,
+também sondam as imagens fixadas do Supabase. O pré-voo não prova chamada de voz,
+entrega WhatsApp ou restauração de dados: essas jornadas exigem teste real.
+
+> ⚠️ **Restaurar um backup: o `restore.sh` só restaura num banco VAZIO.** O dump do
+> `backup.sh` sai com `--no-owner --no-privileges` e **sem `--clean`**: ele não tem `DROP` nem
+> `TRUNCATE`, e os `CREATE TABLE` não têm `IF NOT EXISTS`. Antes de pedir a confirmação, o
+> `restore.sh` conta as tabelas de `public` e, se o banco já tem as tabelas do sistema, **para
+> com mensagem própria** — nada é alterado e o `psql` nem é chamado. Ou seja: hoje ele **não**
+> volta o backup por cima da instalação que está em uso (isso está em aberto na issue #2120).
+>
+> O caminho que funciona hoje é restaurar num **projeto Supabase novo, em que o instalador
+> ainda não rodou** (o instalador cria as tabelas, e aí o restore recusa), e depois apontar a
+> instalação para esse projeto — trocando no `.env` a conexão e as chaves do Supabase pelas do
+> projeto novo. Medimos a parte do restore num Supabase recém-criado (`rc=0`, 110 tabelas); a
+> troca do `.env` não foi medida. Se não tiver segurança para fazer essa troca, ou se o seu
+> Supabase roda no próprio servidor (single-server, onde não há projeto novo para criar),
+> **peça ajuda antes**.
+>
+> O `psql` roda **sem** `-v ON_ERROR_STOP=1 --single-transaction`. Essas flags faziam o
+> restore falhar também em **banco vazio**: o dump traz os schemas internos (`auth`,
+> `storage`, `realtime`, `vault`) e extensões como `pg_net`, que já existem num Supabase
+> novo — medido em Supabase novo, Postgres 17 puro e database nova, as três deram `rc=3` e
+> 0 tabelas; sem elas, nos dois primeiros, o mesmo dump entrou com `rc=0` e 110 tabelas. Sem a
+> transação única não há rollback: em falha fatal do `psql`, confira o estado do banco antes
+> de repetir. (Gerar o dump com `--clean --if-exists` mudaria o formato dele — decisão do
+> mantenedor, issue #2120.)
+
+## Publicar outro serviço no mesmo VPS (issue #2724)
+
+Uma wiki, uma landing page, um n8n no mesmo servidor em que o CRM já roda: **não edite o `Caddyfile`**. Os dois arquivos (o da variante normal e o `Caddyfile.single-server`) terminam com um ponto de extensão, e os dois composes montam a mesma pasta local:
+
+```yaml
+- ./caddy-sites:/etc/caddy/sites:ro
+```
+
+O caminho do `import` e o alvo do bind mount são o mesmo — e a régua `tests/unit/ponto-de-extensao-do-caddy.test.ts` reprova qualquer um dos dois que mude sozinho, porque se divergirem o Caddy continua validando e só avisa no log (aí o arquivo existe, o subdomínio não responde e ninguém explica).
+
+Como fazer:
+
+1. Crie `caddy-sites/<nome>.caddy` na raiz do clone (um arquivo novo — **não** edite o `caddy-sites/README.caddy`, que é versionado e alterado trava a atualização):
+
+   ```
+   base.exemplo.com.br {
+   	encode gzip
+   	reverse_proxy wiki:80
+   }
+   ```
+
+2. Suba o serviço extra na rede `caddy-sites` do stack, para o nome `wiki` resolver dentro do contêiner do Caddy: `docker run --network <nome-do-projeto>_caddy-sites --memory 512m ...` (`docker network ls | grep caddy-sites` mostra o nome da rede). Essa rede existe só entre o Caddy e os serviços extras; **não** use a `_internal`, que é a dos serviços internos do CRM. O `--memory` não é decoração: sem teto o serviço novo derruba o CRM junto.
+
+3. Confira e recarregue o proxy, **sem reiniciá-lo**:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml exec caddy caddy validate --config /etc/caddy/Caddyfile
+   docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile
+   # single-server: acrescente -f docker-compose.single-server.yml
+   ```
+
+   Não use `restart caddy`: com um arquivo errado o Caddy reiniciado não sobe, e o CRM sai do ar junto. O `reload` recusa o arquivo errado, diz a linha e mantém no ar o que já estava.
+
+A pasta `caddy-sites/` está no `.gitignore` (só o `README.caddy` é versionado, para a pasta existir no clone novo e o glob do `import` nunca ficar vazio). Seus arquivos não aparecem em `git status`, não entram em `git diff` e **não atrapalham o `update.sh`** — ele troca de versão com `git checkout <tag>` e não toca nesta pasta. HTTPS automático, emissão de certificado e gzip vêm de graça, com o mesmo `ACME_EMAIL` do CRM.
+
+Na atualização, o `update.sh` confere a configuração do proxy (esta pasta inclusive) **antes** de recriá-lo. Se a conferência recusar um arquivo seu, o proxy antigo continua no ar, o CRM segue respondendo e a saída da atualização mostra o motivo, citando `caddy-sites/`.
+
+## Automações e webhooks
+
+O `install.sh` (e o `update.sh`, a cada atualização) já ativa sozinho um cron que roda todo minuto e "puxa" a fila de eventos pendentes (`/api/v1/cron/event-log-drain`) — é isso que faz uma automação disparar de verdade no seu servidor (ex.: enviar uma mensagem de WhatsApp quando um pedido muda de status). **Sem esse cron, as automações ficam paradas na fila e nunca rodam** — é um requisito, não um extra.
+
+Rodar de novo o `install.sh`/`update.sh` não duplica a linha do cron (ele mesmo substitui a antiga). Na 1ª vez que o cron é ativado numa instalação que já existia há um tempo, o script também limpa eventos pendentes com mais de 7 dias (marcando como concluídos, sem apagar histórico) — assim o primeiro drain não sai disparando efeitos atrasados de semanas atrás.
+
+Pra testar na mão, rode no próprio VPS (usa o `INTERNAL_SECRET` do seu `.env`):
+
+```bash
+source .env && curl -s -H "Authorization: Bearer ${INTERNAL_SECRET}" "${NEXT_PUBLIC_APP_URL}/api/v1/cron/event-log-drain"
+```
+
+Resposta esperada: `{"data":{"scanned":N,...}}` (N pode ser 0 se não houver eventos na fila — o importante é receber esse formato, não um erro de autenticação ou de conexão).
+
+## CA do Supabase e TLS verificado (issue #829)
+
+Quem exige verificação TLS (`sslmode=verify-full`, Node com `rejectUnauthorized: true`) falha com
+`SELF_SIGNED_CERT_IN_CHAIN` na conexão com o pooler do Supabase: a cadeia dele não está na trust
+store padrão do servidor. A correção **nunca é desligar a verificação** — é declarar a CA oficial
+com UMA chave no `.env`:
+
+```bash
+mkdir -p /root/certs
+curl -fsSL -o /root/certs/prod-ca-2021.crt \
+  https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt
+```
+
+```bash
+# no .env do projeto
+SUPABASE_SSL_ROOT_CERT=/root/certs/prod-ca-2021.crt
+```
+
+O valor é o caminho **desta máquina (host)**, fora do checkout. Com a chave declarada e o arquivo
+existindo, o kit entrega a mesma CA aos três consumidores da issue:
+
+| consumidor | como recebe |
+|---|---|
+| runtime (`app`, `worker`, `scheduler`) | overlay `docker-compose.supabase-ca.yml` — volume `:ro` + `NODE_EXTRA_CA_CERTS`; o `dc()` do kit só acrescenta o overlay com a CA pronta |
+| clientes Postgres efêmeros (`docker run postgres:17-alpine psql`, `pg_dump`, baseline, backup/restore) | `pg_container()` monta o arquivo `:ro` e exporta `PGSSLROOTCERT` |
+| diagnóstico | `healthcheck.sh` roda `select 1` com `sslmode=verify-full` + `sslrootcert` |
+
+Confira com o diagnóstico do kit:
+
+```bash
+bash hostgator-setup-kit/healthcheck.sh
+# com a CA:  ✓ TLS do banco verificado (sslmode=verify-full com a CA de SUPABASE_SSL_ROOT_CERT)
+# sem ela:   (opcional) SUPABASE_SSL_ROOT_CERT não declarada no .env — nada a verificar.
+```
+
+Idempotente (pode rodar quantas vezes quiser), sem segredo em log (o kit nunca imprime a connection
+string), e a verificação de cadeia e de hostname continua ligada nos dois sentidos. A instalação que
+não declara a chave continua com o comportamento de antes; o healthcheck só mostra uma linha
+informativa, e no single-server diz que o passo não se aplica.
+
+Um efeito para quem **declara** a CA: na libpq, `PGSSLROOTCERT` apontando para um arquivo que existe
+faz `sslmode=require` se comportar como `verify-ca`. Nos psql do kit (instalação, atualização,
+backup), uma connection string com `require` passa a verificar a cadeia — e uma CA errada faz esses
+comandos falharem fechado. Sem `sslmode` na string, vale o padrão da libpq (`prefer`), que não
+verifica certificado — e isso não muda.
+
+## Suporte
+
+Problemas comuns e como resolver estão no `CLAUDE.md` (seção "Quando der problema").
