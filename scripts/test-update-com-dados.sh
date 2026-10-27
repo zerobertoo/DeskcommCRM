@@ -138,6 +138,23 @@ if [ "$(grep -c 'create extension' <<<"$prelude")" -lt 3 ]; then
   echo "FATAL: scripts/selfhost-prelude.sql está vazio ou sem 'create extension'." >&2
   exit 1
 fi
+# A guarda acima só olha `create extension`, e `alter default privileges` é outra
+# coisa que o prelude carrega e que se perde do mesmo jeito (issue #887). A perda
+# não tem sintoma na hora: o `update` roda, o baseline aplica, e as tabelas do
+# corpo nascem sem o privilégio padrão do Supabase — que é precisamente o mundo
+# em que "o papel X não tem o privilégio Y" fica verde por construção. Uma família
+# por linha, e as três: funções, tabelas e sequences.
+for familia in functions tables sequences; do
+  if ! grep -qiE "^alter default privileges .* on ${familia} " <<<"$prelude"; then
+    echo "FATAL: a extração do prelude perdeu 'alter default privileges … on ${familia}'." >&2
+    echo "       As três famílias do pg_default_acl do Supabase (functions, tables, sequences)" >&2
+    echo "       moram dentro do bloco \`psql_install <<'SQL'\` do scripts/test-db.sh e são" >&2
+    echo "       extraídas junto com ele. Sem elas este gate mede um banco MAIS RESTRITIVO que o" >&2
+    echo "       do cliente, e todo invariante de negação de privilégio passa por construção." >&2
+    echo "       Conserte o recorte aqui — não duplique o prelude." >&2
+    exit 1
+  fi
+done
 psql_stop <<<"$prelude"
 echo "    ✓ prelude ok ($(wc -l <<<"$prelude" | tr -d ' ') linhas, de scripts/selfhost-prelude.sql)"
 

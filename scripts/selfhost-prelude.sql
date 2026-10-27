@@ -96,6 +96,22 @@ alter default privileges for role postgres in schema public grant all on tables 
 alter default privileges for role postgres in schema public grant all on tables to authenticated;
 alter default privileges for role postgres in schema public grant all on tables to service_role;
 
+-- PERFIL LEGADO DO BOOTSTRAP, TAMBÉM PARA SEQUENCES (Refs #887).
+--
+-- O harness reproduz o perfil ALL observado nas imagens Supabase legadas, para
+-- que um REVOKE do produto seja testado contra uma origem realmente concedida.
+-- Em sequence, ALL concede SELECT, UPDATE e USAGE. nextval aceita USAGE OU
+-- UPDATE; currval/lastval aceitam USAGE OU SELECT. Sem a concessão de sequence,
+-- o modelo fica mais restritivo que o perfil legado e uma negação pode passar
+-- no gate enquanto o papel conseguiria usar a sequence no produto modelado.
+--
+-- Perfil medido em supabase/postgres:15.19.0.004 (26/10/2026):
+-- postgres/public: TABLES arwdDxt, SEQUENCES rwU, FUNCTIONS X nos três papéis.
+-- `scripts/test-db.sh` sonda este bloco antes do baseline e aborta se faltar.
+alter default privileges for role postgres in schema public grant all on sequences to anon;
+alter default privileges for role postgres in schema public grant all on sequences to authenticated;
+alter default privileges for role postgres in schema public grant all on sequences to service_role;
+
 create schema if not exists auth;
 create schema if not exists extensions;
 

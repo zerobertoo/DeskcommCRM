@@ -116,7 +116,11 @@ function montarAuth(
         const { rows } = await poolDeAuth().query<{ id: string }>("select id from auth.sessions where token = $1", [r.token]);
         if (rows[0]) definirSessao({ userId: r.user.id, sessionId: rows[0].id, aal: "aal1" });
         const user = await buscarUsuarioPorId(r.user.id);
-        return { data: { user, session: { access_token: r.token, user } }, error: null };
+        // JWT com `session_id`, como o GoTrue devolvia: o dispositivo confiável amarra a sessão por ele
+        const accessToken = rows[0]
+          ? (await emitirTokenDoUsuario({ userId: r.user.id, sessionId: rows[0].id, aal: "aal1" })).token
+          : r.token;
+        return { data: { user, session: { access_token: accessToken, user } }, error: null };
       } catch (e) {
         const { message, status } = mensagemDe(e);
         return { data: { user: null, session: null }, error: erroCompat(message, status, "invalid_credentials") };
