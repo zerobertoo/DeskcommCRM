@@ -14,7 +14,6 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 import { hashPassword } from "better-auth/crypto";
 import { Pool } from "pg";
-import { verificarSenha } from "@/lib/auth/senha-legada";
 import { env } from "@/lib/env";
 import { sessaoDireta } from "@/lib/auth/sessao-direta";
 import { cookieSecure } from "@/lib/supabase/cookie-secure";
@@ -35,7 +34,7 @@ function criarAuth() {
     database: poolDeAuth(),
     secret: env.PGRST_JWT_SECRET,
     baseURL: env.NEXT_PUBLIC_APP_URL,
-    emailAndPassword: { enabled: true, password: { hash: (senha) => hashPassword(senha), verify: verificarSenha } },
+    emailAndPassword: { enabled: true, password: { hash: (senha) => hashPassword(senha) } },
     advanced: {
       database: { generateId: "uuid" },
       cookiePrefix: "crm",

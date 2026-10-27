@@ -50,7 +50,7 @@ describe("sem a plataforma Supabase", () => {
 
   it("nenhum código aponta para um projeto hospedado (*.supabase.co)", () => {
     // o placeholder do build é conhecido e vigiado por placeholder-do-supabase-recusa-sem-dns.test.ts
-    const achados = achar(/[a-z0-9-]+\.supabase\.(co|in)\b/).filter((l) => !/placeholder|migrar-do-supabase/.test(l));
+    const achados = achar(/[a-z0-9-]+\.supabase\.(co|in)\b/).filter((l) => !/placeholder/.test(l));
     expect(achados).toEqual([]);
   });
 });
