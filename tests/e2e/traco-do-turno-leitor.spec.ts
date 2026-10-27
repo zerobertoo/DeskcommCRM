@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
-
 import type { Database } from "../../lib/database.types";
+import { createClient } from "../../scripts/lib/cliente-supabase";
 import { credenciaisSupabaseDeTeste } from "../../scripts/lib/env-de-teste";
 import { test, expect, type APIRequestContext } from "./helpers/test";
 
@@ -58,25 +56,12 @@ test("API parcial: gerente lê só seu tenant, viewer é recusado e o recibo nã
         }),
       "membership",
     );
-    const cookies = new Map<string, string>();
-    const auth = createServerClient(c.url, c.anonKey, {
-      cookieOptions: { name: "sb-deskcomm-auth", secure: false, sameSite: "strict", path: "/" },
-      cookies: {
-        getAll: () => [...cookies].map(([name, value]) => ({ name, value })),
-        setAll: (novos: { name: string; value: string; options: CookieOptions }[]) => {
-          for (const cookie of novos) cookies.set(cookie.name, cookie.value);
-        },
-      },
-    });
-    conferir(await auth.auth.signInWithPassword({ email, password }), "login real");
-    expect(cookies.size).toBeGreaterThan(0);
-    const context = await playwright.request.newContext({
-      baseURL: app,
-      extraHTTPHeaders: {
-        cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join("; "),
-      },
-    });
+    // login real no Better Auth do app: o contexto guarda o cookie da resposta
+    const context = await playwright.request.newContext({ baseURL: app, extraHTTPHeaders: { origin: app } });
     contexts.push(context);
+    const login = await context.post("/api/auth/sign-in/email", { data: { email, password } });
+    conferir({ error: login.ok() ? null : login.status() }, "login real");
+    expect((await context.storageState()).cookies.length).toBeGreaterThan(0);
     return context;
   };
 
